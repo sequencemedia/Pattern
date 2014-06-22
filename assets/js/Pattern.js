@@ -103,46 +103,50 @@ var Pattern = (function () {
 
 			}
 			ModelManager.prototype.defaultValuesFor = function (mid) {
-				return (this.allDefaultAttributes()[mid] || (this.allDefaultAttributes()[mid] = {}));
+				var defaultAttributes = this.allDefaultAttributes();
+				return (defaultAttributes[mid] || (defaultAttributes[mid] = {}));
 			};
 			ModelManager.prototype.changedValuesFor = function (mid) {
-				return (this.allChangedAttributes()[mid] || (this.allChangedAttributes()[mid] = {}));
+				var changedAttributes = this.allChangedAttributes();
+				return (changedAttributes[mid] || (changedAttributes[mid] = {}));
 			};
 			ModelManager.prototype.currentValuesFor = function (mid) {
-				return (this.allCurrentAttributes()[mid] || (this.allCurrentAttributes()[mid] = {}));
+				var currentAttributes = this.allCurrentAttributes();
+				return (currentAttributes[mid] || (currentAttributes[mid] = {}));
 			};
 			ModelManager.prototype.validatorsFor = function (mid) {
-				return (this.allValidators()[mid] || (this.allValidators()[mid] = {}));
+				var validators = this.allValidators();
+				return (validators[mid] || (validators[mid] = {}));
 			};
 			ModelManager.prototype.getDefaultValue = function (mid, key) {
 				return this.defaultValuesFor(mid)[key];
 			};
 			ModelManager.prototype.setDefaultValue = function (mid, key, value) {
-				this.defaultValuesFor(mid)[key] = value;
+				(this.defaultValuesFor(mid))[key] = value;
 			};
 			ModelManager.prototype.isDefaultValue = function (mid, key, value) {
-				return (value === this.getDefaultValue(mid, key));
+				return (value === this.getDefaultValue(mid, key)) ? true : false;
 			};
 			ModelManager.prototype.getChangedValue = function (mid, key) {
 				return this.changedValuesFor(mid)[key];
 			};
 			ModelManager.prototype.setChangedValue = function (mid, key, value) {
-				this.changedValuesFor(mid)[key] = value;
+				(this.changedValuesFor(mid))[key] = value;
 			};
 			ModelManager.prototype.isChangedValue = function (mid, key, value) {
-				return (value === this.getChangedValue(mid, key));
+				return (value === this.getChangedValue(mid, key)) ? true : false;
 			};
 			ModelManager.prototype.getCurrentValue = function (mid, key) {
 				return this.currentValuesFor(mid)[key];
 			};
 			ModelManager.prototype.setCurrentValue = function (mid, key, value) {
-				this.currentValuesFor(mid)[key] = value;
+				(this.currentValuesFor(mid))[key] = value;
 			};
 			ModelManager.prototype.isCurrentValue = function (mid, key, value) {
-				return (value === this.getCurrentValue(mid, key));
+				return (value === this.getCurrentValue(mid, key)) ? true : false;
 			};
 			ModelManager.prototype.validate = function (mid, key, value) {
-				var validator = this.validatorsFor(mid)[key];
+				var validator = (this.validatorsFor(mid))[key];
 				return (validator || false).constructor === Function ? validator(key, value) : true;
 			};
 			ModelManager.prototype.import = function (toImport) { };
