@@ -179,7 +179,7 @@ var Pattern = (function () {
 				(this.allModels())[mid] = model;
 			};
 			ModelManager.prototype.getIDKey = function(mid) {
-				return ((this.allIdKeys())[mid] || "id");
+				return (this.allIdKeys())[mid] || "id";
 			};
 			ModelManager.prototype.setIDKey = function(mid, key) {
 				if (typeof key === "string") (this.allIdKeys())[mid] = key;
