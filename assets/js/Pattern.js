@@ -3,10 +3,6 @@ var Pattern = (function () {
 	"use strict";
 
 	var Model,
-		ModelList,
-		View,
-		ViewList,
-		Controller,
 		createUID;
 
 	function createMID(uid) { return "mid-" + uid; }
@@ -31,10 +27,9 @@ var Pattern = (function () {
 
 		ModelManager = (function () {
 
-			var models = {},
-				eventManager;
+			var eventManager;
 
-			function EventManager() { };
+			function EventManager() { }
 			EventManager.prototype.raise = function (type, parameters) { console.log(type, parameters); };
 
 			function raiseUndoOneEvent(mid, key) {
@@ -285,7 +280,6 @@ var Pattern = (function () {
 		View: View,
 		ViewList: ViewList,
 		Controller: Controller
-
 
 	};
 
