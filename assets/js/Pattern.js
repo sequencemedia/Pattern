@@ -42,14 +42,14 @@ var Pattern = (function () {
 					key: key,
 					currentValue: modelManager.getCurrentValue(mid, key),
 					changedValue: modelManager.getChangedValue(mid, key),
-					target: this
+					target: (modelManager.allModels())[mid]
 				});
 			}
 			function raiseUndoAllEvent(mid) {
 				eventManager.raise("undoAll", {
 					currentValues: modelManager.export(modelManager.currentValuesFor(mid)), // this publishes the cache by reference -- no longer private
 					changedValues: modelManager.export(modelManager.changedValuesFor(mid)), // this publishes the cache by reference -- no longer private
-					target: this
+					target: (modelManager.allModels())[mid]
 				});
 			}
 			function raiseChangeEvent(mid, key) {
@@ -57,19 +57,19 @@ var Pattern = (function () {
 					key: key,
 					currentValue: modelManager.getCurrentValue(mid, key),
 					changedValue: modelManager.getChangedValue(mid, key),
-					target: this
+					target: (modelManager.allModels())[mid]
 				});
 			}
 			function raisePrepareEvent(mid) {
 				eventManager.raise("prepare", {
 					values: modelManager.export(modelManager.currentValuesFor(mid)),
-					target: this
+					target: (modelManager.allModels())[mid]
 				});
 			}
 			function raiseRestoreEvent(mid) {
 				eventManager.raise("restore", {
 					values: modelManager.export(modelManager.currentValuesFor(mid)),
-					target: this
+					target: (modelManager.allModels())[mid]
 				});
 			}
 
@@ -234,7 +234,7 @@ var Pattern = (function () {
 			var mid = this.mid();
 			modelManager.prepare(mid, pairs);
 			if (idKey !== modelManager.getIDKey(mid)) modelManager.setIDKey(mid, idKey);
-			modelManager.manage(mid, model);
+			modelManager.manage(mid, this);
 		}
 		Model.prototype.mid = (function () {
 			var mid;
