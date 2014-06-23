@@ -279,8 +279,8 @@ var Pattern = (function () {
 							}
 						}
 					}
+					if (changed) raiseSetEachEvent(mid, key);
 				}
-				if (changed) raiseSetEachEvent(mid, key);
 			};
 			ModelManager.prototype.setAll = function (mid, value) {
 				var key, pairs = this.currentValuesFor(mid), changed;
@@ -320,8 +320,8 @@ var Pattern = (function () {
 							}
 						}
 					}
+					if (changed) raiseZedEachEvent(mid, keys);
 				}
-				if (changed) raiseZedEachEvent(mid, keys);
 			};
 			ModelManager.prototype.zedAll = function (mid) {
 				var key, pairs = this.changedValuesFor(mid), value, changed;
@@ -360,8 +360,8 @@ var Pattern = (function () {
 							changed = true;
 						}
 					}
+					if (changed) raiseUnsetEachEvent(mid, keys);
 				}
-				if (changed) raiseUnsetEachEvent(mid, keys);
 			};
 			ModelManager.prototype.unsetAll = function (mid) {
 				var pairs = this.currentValuesFor(mid), key, value, changed;
@@ -401,8 +401,8 @@ var Pattern = (function () {
 							}
 						}
 					}
+					if (changed) raiseResetEachEvent(mid, keys);
 				}
-				if (changed) raiseResetEachEvent(mid, keys);
 			};
 			ModelManager.prototype.resetAll = function (mid) {
 				var pairs = this.defaultValuesFor(mid), key, value, changed;
