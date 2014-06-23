@@ -306,27 +306,30 @@ var Pattern = (function () {
 				}
 			};
 			ModelManager.prototype.zedEach = function (mid, keys) {
-				var key, pairs, value, changed;
+				var key, pairs = this.changedValuesFor(mid), value, changed;
 				if ((keys || false).constructor === Array) {
-					while (key = keys.shift()) { //can't zed unknown keys
-						value = this.getChangedValue(mid, key);
-						if (!this.isCurrentValue(mid, key, value)) {
-							this.setChangedValue(mid, key, this.getCurrentValue(mid, key));
-							this.setCurrentValue(mid, key, value);
-							raiseChangeEvent(mid, key);
-							changed = true;
+					while (key = keys.shift()) {
+						//console.log(key, key in pairs, !this.isCurrentValue(mid, key, value));
+						if (key in pairs) { //can't zed unknown keys
+							value = pairs[key];
+							if (!this.isCurrentValue(mid, key, value)) {
+								this.setChangedValue(mid, key, this.getCurrentValue(mid, key));
+								this.setCurrentValue(mid, key, value);
+								raiseChangeEvent(mid, key);
+								changed = true;
+							}
 						}
 					}
 				}
-				if (changed) raiseZedEachEvent(mid, key);
+				if (changed) raiseZedEachEvent(mid, keys);
 			};
 			ModelManager.prototype.zedAll = function (mid) {
-				var key, pairs = this.currentValuesFor(mid), value, changed;
+				var key, pairs = this.changedValuesFor(mid), value, changed;
 				for (key in pairs) {
 					value = pairs[key]; //implicitly is changed
-					if (!this.isChangedValue(mid, key, value)) {
-						this.setCurrentValue(mid, key, this.getChangedValue(mid, key));
-						this.setChangedValue(mid, key, value);
+					if (!this.isCurrentValue(mid, key, value)) {
+						this.setChangedValue(mid, key, this.getCurrentValue(mid, key));
+						this.setCurrentValue(mid, key, value);
 						raiseChangeEvent(mid, key);
 						changed = true;
 					}
@@ -358,7 +361,7 @@ var Pattern = (function () {
 						}
 					}
 				}
-				if (changed) raiseUnsetEachEvent(mid, key);
+				if (changed) raiseUnsetEachEvent(mid, keys);
 			};
 			ModelManager.prototype.unsetAll = function (mid) {
 				var pairs = this.currentValuesFor(mid), key, value, changed;
@@ -374,27 +377,32 @@ var Pattern = (function () {
 				if (changed) raiseUnsetAllEvent(mid);
 			};
 			ModelManager.prototype.reset = function (mid, key) {
-				var value = this.getDefaultValue(mid, key);
-				if (!this.isCurrentValue(mid, key, value)) {
-					this.setChangedValue(mid, key, this.getCurrentValue(mid, key));
-					this.setCurrentValue(mid, key, value);
-					raiseChangeEvent(mid, key);
+				var pairs = thid.defaultValuesFor(mid), value;
+				if (key in pairs) {
+					value = pairs[key];
+					if (!this.isCurrentValue(mid, key, value)) {
+						this.setChangedValue(mid, key, this.getCurrentValue(mid, key));
+						this.setCurrentValue(mid, key, value);
+						raiseChangeEvent(mid, key);
+					}
 				}
 			};
 			ModelManager.prototype.resetEach = function (mid, keys) {
-				var key, pairs, value, changed;
+				var key, pairs = this.defaultValuesFor(mid), value, changed;
 				if ((keys || false).constructor === Array) {
-					while (key = keys.shift()) { //can't zed unknown keys
-						value = this.getDefaultValue(mid, key);
-						if (!this.isCurrentValue(mid, key, value)) {
-							this.setChangedValue(mid, key, this.getCurrentValue(mid, key));
-							this.setCurrentValue(mid, key, value);
-							raiseChangeEvent(mid, key);
-							changed = true;
+					while (key = keys.shift()) {
+						if (key in pairs) { //can't zed unknown keys
+							value = pairs[key];
+							if (!this.isCurrentValue(mid, key, value)) {
+								this.setChangedValue(mid, key, this.getCurrentValue(mid, key));
+								this.setCurrentValue(mid, key, value);
+								raiseChangeEvent(mid, key);
+								changed = true;
+							}
 						}
 					}
 				}
-				if (changed) raiseResetEachEvent(mid, key);
+				if (changed) raiseResetEachEvent(mid, keys);
 			};
 			ModelManager.prototype.resetAll = function (mid) {
 				var pairs = this.defaultValuesFor(mid), key, value, changed;
