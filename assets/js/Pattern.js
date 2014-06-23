@@ -32,16 +32,39 @@ var Pattern = (function () {
 			function EventManager() { }
 			EventManager.prototype.raise = function (type, parameters) { console.log(type, parameters); };
 
-			function raiseUndoOneEvent(mid, key) {
-				eventManager.raise("undoOne", {
+			/*
+			function raiseZedEvent(mid, key) {
+				eventManager.raise("zed", {
 					key: key,
 					currentValue: modelManager.getCurrentValue(mid, key),
 					changedValue: modelManager.getChangedValue(mid, key),
 					target: (modelManager.allModels())[mid]
 				});
 			}
-			function raiseUndoAllEvent(mid) {
-				eventManager.raise("undoAll", {
+			*/
+			function raiseSetEachEvent(mid) {
+				eventManager.raise("setEach", {
+					currentValues: modelManager.export(modelManager.currentValuesFor(mid)), // this publishes the cache by reference -- no longer private
+					changedValues: modelManager.export(modelManager.changedValuesFor(mid)), // this publishes the cache by reference -- no longer private
+					target: (modelManager.allModels())[mid]
+				});
+			}
+			function raiseSetAllEvent(mid) {
+				eventManager.raise("setAll", {
+					currentValues: modelManager.export(modelManager.currentValuesFor(mid)), // this publishes the cache by reference -- no longer private
+					changedValues: modelManager.export(modelManager.changedValuesFor(mid)), // this publishes the cache by reference -- no longer private
+					target: (modelManager.allModels())[mid]
+				});
+			}
+			function raiseZedEachEvent(mid) {
+				eventManager.raise("zedEach", {
+					currentValues: modelManager.export(modelManager.currentValuesFor(mid)), // this publishes the cache by reference -- no longer private
+					changedValues: modelManager.export(modelManager.changedValuesFor(mid)), // this publishes the cache by reference -- no longer private
+					target: (modelManager.allModels())[mid]
+				});
+			}
+			function raiseZedAllEvent(mid) {
+				eventManager.raise("zedAll", {
 					currentValues: modelManager.export(modelManager.currentValuesFor(mid)), // this publishes the cache by reference -- no longer private
 					changedValues: modelManager.export(modelManager.changedValuesFor(mid)), // this publishes the cache by reference -- no longer private
 					target: (modelManager.allModels())[mid]
@@ -61,9 +84,51 @@ var Pattern = (function () {
 					target: (modelManager.allModels())[mid]
 				});
 			}
-			function raiseRestoreEvent(mid) {
-				eventManager.raise("restore", {
-					values: modelManager.export(modelManager.currentValuesFor(mid)),
+			/*
+			function raiseUnsetEvent(mid, key) {
+				eventManager.raise("unset", {
+					key: key,
+					currentValue: modelManager.getCurrentValue(mid, key),
+					changedValue: modelManager.getChangedValue(mid, key),
+					target: (modelManager.allModels())[mid]
+				});
+			}
+			*/
+			function raiseUnsetEachEvent(mid) {
+				eventManager.raise("unsetEach", {
+					changedValues: modelManager.export(modelManager.changedValuesFor(mid)),
+					currentValues: modelManager.export(modelManager.currentValuesFor(mid)),
+					target: (modelManager.allModels())[mid]
+				});
+			}
+			function raiseUnsetAllEvent(mid) {
+				eventManager.raise("unsetAll", {
+					changedValues: modelManager.export(modelManager.changedValuesFor(mid)),
+					currentValues: modelManager.export(modelManager.currentValuesFor(mid)),
+					target: (modelManager.allModels())[mid]
+				});
+			}
+			/*
+			function raiseResetEvent(mid, key) {
+				eventManager.raise("reset", {
+					key: key,
+					currentValue: modelManager.getCurrentValue(mid, key),
+					changedValue: modelManager.getChangedValue(mid, key),
+					target: (modelManager.allModels())[mid]
+				});
+			}
+			*/
+			function raiseResetEachEvent(mid) {
+				eventManager.raise("resetEach", {
+					changedValues: modelManager.export(modelManager.changedValuesFor(mid)),
+					currentValues: modelManager.export(modelManager.currentValuesFor(mid)),
+					target: (modelManager.allModels())[mid]
+				});
+			}
+			function raiseResetAllEvent(mid) {
+				eventManager.raise("resetAll", {
+					changedValues: modelManager.export(modelManager.changedValuesFor(mid)),
+					currentValues: modelManager.export(modelManager.currentValuesFor(mid)),
 					target: (modelManager.allModels())[mid]
 				});
 			}
@@ -114,7 +179,7 @@ var Pattern = (function () {
 				return (validators[mid] || (validators[mid] = {}));
 			};
 			ModelManager.prototype.getDefaultValue = function (mid, key) {
-				return this.defaultValuesFor(mid)[key];
+				return (this.defaultValuesFor(mid))[key];
 			};
 			ModelManager.prototype.setDefaultValue = function (mid, key, value) {
 				(this.defaultValuesFor(mid))[key] = value;
@@ -123,7 +188,7 @@ var Pattern = (function () {
 				return (value === this.getDefaultValue(mid, key)) ? true : false;
 			};
 			ModelManager.prototype.getChangedValue = function (mid, key) {
-				return this.changedValuesFor(mid)[key];
+				return (this.changedValuesFor(mid))[key];
 			};
 			ModelManager.prototype.setChangedValue = function (mid, key, value) {
 				(this.changedValuesFor(mid))[key] = value;
@@ -132,7 +197,7 @@ var Pattern = (function () {
 				return (value === this.getChangedValue(mid, key)) ? true : false;
 			};
 			ModelManager.prototype.getCurrentValue = function (mid, key) {
-				return this.currentValuesFor(mid)[key];
+				return (this.currentValuesFor(mid))[key];
 			};
 			ModelManager.prototype.setCurrentValue = function (mid, key, value) {
 				(this.currentValuesFor(mid))[key] = value;
@@ -144,7 +209,7 @@ var Pattern = (function () {
 				var validator = (this.validatorsFor(mid))[key];
 				return (validator || false).constructor === Function ? validator(key, value) : true;
 			};
-			ModelManager.prototype.import = function (toImport) { };
+			ModelManager.prototype.import = function (toImport, pairs) { };
 			ModelManager.prototype.export = function (toExport) {
 				var key, value, pairs = {};
 				for (key in toExport) {
@@ -163,18 +228,6 @@ var Pattern = (function () {
 				}
 				raisePrepareEvent(mid);
 			};
-			ModelManager.prototype.restore = function (mid) {
-				var pairs = this.currentValuesFor(mid), key, value, changed;
-				for (key in pairs) {
-					value = pairs[key];
-					if (!this.isDefaultValue(mid, key, value)) {
-						this.setChangedValue(mid, key, this.getCurrentValue(mid, key));
-						this.setCurrentValue(mid, key, this.getDefaultValue(mid, key));
-						changed = true;
-					}
-				}
-				if (changed) raiseRestoreEvent(mid);
-			};
 			ModelManager.prototype.manage = function (mid, model) {
 				(this.allModels())[mid] = model;
 			};
@@ -188,6 +241,19 @@ var Pattern = (function () {
 				key = key === "id" ? this.getIDKey(mid) : key;
 				return this.getCurrentValue(mid, key);
 			};
+			ModelManager.prototype.getEach = function (mid, keys) {
+				var key, pairs;
+				if ((keys || false).constructor === Array) {
+					pairs = {};
+					while (key = keys.shift()) {
+						pairs[key] = this.get(mid, key);
+					}
+					return pairs;
+				}
+			};
+			ModelManager.prototype.getAll = function (mid) {
+				return this.export(this.currentValuesFor(mid));
+			};
 			ModelManager.prototype.set = function (mid, key, value) {
 				key = key === "id" ? this.getIDKey(mid) : key;
 				if (!this.isCurrentValue(mid, key, value)) {
@@ -198,25 +264,150 @@ var Pattern = (function () {
 					}
 				}
 			};
-			ModelManager.prototype.undoOne = function (mid, key) {
-				var value;
-				key = key === "id" ? this.getIDKey(mid) : key;
-				value = this.getChangedValue(mid, key);
+			ModelManager.prototype.setEach = function (mid, pairs) {
+				var key, value, changed;
+				if ((pairs || false).constructor === Object) {
+					for (key in pairs) {
+						key = key === "id" ? this.getIDKey(mid) : key;
+						value = pairs[key];
+						if (!this.isCurrentValue(mid, key, value)) {
+							if (this.validate(mid, key, value)) {
+								this.setChangedValue(mid, key, this.getCurrentValue(mid, key));
+								this.setCurrentValue(mid, key, value);
+								raiseChangeEvent(mid, key);
+								changed = true;
+							}
+						}
+					}
+				}
+				if (changed) raiseSetEachEvent(mid, key);
+			};
+			ModelManager.prototype.setAll = function (mid, value) {
+				var key, pairs = this.currentValuesFor(mid), changed;
+				for (key in pairs) {
+					key = key === "id" ? this.getIDKey(mid) : key;
+					if (!this.isCurrentValue(mid, key, value)) {
+						if (this.validate(mid, key, value)) {
+							this.setChangedValue(mid, key, this.getCurrentValue(mid, key));
+							this.setCurrentValue(mid, key, value);
+							raiseChangeEvent(mid, key);
+							changed = true;
+						}
+					}
+				}
+				if (changed) raiseSetAllEvent(mid, key);
+			};
+			ModelManager.prototype.zed = function (mid, key) {
+				var value = this.getChangedValue(mid, key);
 				if (!this.isCurrentValue(mid, key, value)) {
+					this.setChangedValue(mid, key, this.getCurrentValue(mid, key));
 					this.setCurrentValue(mid, key, value);
-					raiseUndoOneEvent(mid, key);
+					raiseChangeEvent(mid, key);
 				}
 			};
-			ModelManager.prototype.undoAll = function (mid) {
-				var pairs = this.changedValuesFor(mid), key, value, changed;
+			ModelManager.prototype.zedEach = function (mid, keys) {
+				var key, pairs, value, changed;
+				if ((keys || false).constructor === Array) {
+					while (key = keys.shift()) { //can't zed unknown keys
+						value = this.getChangedValue(mid, key);
+						if (!this.isCurrentValue(mid, key, value)) {
+							this.setChangedValue(mid, key, this.getCurrentValue(mid, key));
+							this.setCurrentValue(mid, key, value);
+							raiseChangeEvent(mid, key);
+							changed = true;
+						}
+					}
+				}
+				if (changed) raiseZedEachEvent(mid, key);
+			};
+			ModelManager.prototype.zedAll = function (mid) {
+				var key, pairs = this.currentValuesFor(mid), value, changed;
 				for (key in pairs) {
-					value = pairs[key];
-					if (!this.isCurrentValue(mid, key, value)) {
-						this.setCurrentValue(mid, key, value);
+					value = pairs[key]; //implicitly is changed
+					if (!this.isChangedValue(mid, key, value)) {
+						this.setCurrentValue(mid, key, this.getChangedValue(mid, key));
+						this.setChangedValue(mid, key, value);
+						raiseChangeEvent(mid, key);
 						changed = true;
 					}
 				}
-				if (changed) raiseUndoAllEvent(mid);
+				if (changed) raiseZedAllEvent(mid, key);
+			};
+			ModelManager.prototype.unset = function (mid, key) {
+				var pairs = this.currentValuesFor(mid), value;
+				if (key in pairs) {
+					value = pairs[key];
+					if (!this.isChangedValue(mid, key, value)) {
+						this.setChangedValue(mid, key, value);
+					}
+					delete pairs[key];
+					raiseChangeEvent(mid, key);
+				}
+			};
+			ModelManager.prototype.unsetEach = function (mid, keys) {
+				var key, pairs = this.currentValuesFor(mid), value, changed;
+				if ((keys || false).constructor === Array) {
+					while (key = keys.shift()) { //can't zed unknown keys
+						if (key in pairs) {
+							if (!this.isChangedValue(mid, key, value)) {
+								this.setChangedValue(mid, key, value);
+							}
+							delete pairs[key];
+							raiseChangeEvent(mid, key);
+							changed = true;
+						}
+					}
+				}
+				if (changed) raiseUnsetEachEvent(mid, key);
+			};
+			ModelManager.prototype.unsetAll = function (mid) {
+				var pairs = this.currentValuesFor(mid), key, value, changed;
+				for (key in pairs) {
+					value = pairs[key];
+					if (!this.isChangedValue(mid, key, value)) {
+						this.setChangedValue(mid, key, value);
+					}
+					delete pairs[key];
+					raiseChangeEvent(mid, key);
+					changed = true;
+				}
+				if (changed) raiseUnsetAllEvent(mid);
+			};
+			ModelManager.prototype.reset = function (mid, key) {
+				var value = this.getDefaultValue(mid, key);
+				if (!this.isCurrentValue(mid, key, value)) {
+					this.setChangedValue(mid, key, this.getCurrentValue(mid, key));
+					this.setCurrentValue(mid, key, value);
+					raiseChangeEvent(mid, key);
+				}
+			};
+			ModelManager.prototype.resetEach = function (mid, keys) {
+				var key, pairs, value, changed;
+				if ((keys || false).constructor === Array) {
+					while (key = keys.shift()) { //can't zed unknown keys
+						value = this.getDefaultValue(mid, key);
+						if (!this.isCurrentValue(mid, key, value)) {
+							this.setChangedValue(mid, key, this.getCurrentValue(mid, key));
+							this.setCurrentValue(mid, key, value);
+							raiseChangeEvent(mid, key);
+							changed = true;
+						}
+					}
+				}
+				if (changed) raiseResetEachEvent(mid, key);
+			};
+			ModelManager.prototype.resetAll = function (mid) {
+				var pairs = this.defaultValuesFor(mid), key, value, changed;
+				for (key in pairs) {
+					value = pairs[key];
+					if (!this.isCurrentValue(mid, key, value)) {
+						this.setChangedValue(mid, key, this.getCurrentValue(mid, key));
+						this.setCurrentValue(mid, key, value);
+						raiseChangeEvent(mid, key);
+						changed = true;
+					}
+				}
+				if (changed) raiseResetAllEvent(mid);
 			};
 
 			eventManager = new EventManager();
@@ -240,17 +431,47 @@ var Pattern = (function () {
 		Model.prototype.get = function (key) {
 			return modelManager.get(this.mid(), key);
 		};
+		Model.prototype.getEach = function (keys) {
+			return modelManager.getEach(this.mid(), keys);
+		};
+		Model.prototype.getAll = function () {
+			return modelManager.getAll(this.mid());
+		};
 		Model.prototype.set = function (key, value) {
 			modelManager.set(this.mid(), key, value);
 		};
-		Model.prototype.undoOne = function (key) {
-			modelManager.undoOne(this.mid(), key);
+		Model.prototype.setEach = function (pairs) {
+			modelManager.setEach(this.mid(), pairs);
 		};
-		Model.prototype.undoAll = function () {
-			modelManager.undoAll(this.mid());
+		Model.prototype.setAll = function (value) {
+			modelManager.setAll(this.mid(), value);
 		};
-		Model.prototype.restore = function () {
-			modelManager.restore(this.mid());
+		Model.prototype.zed = function (key) {
+			modelManager.zed(this.mid(), key);
+		};
+		Model.prototype.zedEach = function (keys) {
+			modelManager.zedEach(this.mid(), keys);
+		};
+		Model.prototype.zedAll = function () {
+			modelManager.zedAll(this.mid());
+		};
+		Model.prototype.unset = function (key) {
+			modelManager.unset(this.mid(), key);
+		};
+		Model.prototype.unsetEach = function (keys) {
+			modelManager.unsetEach(this.mid(), keys);
+		};
+		Model.prototype.unsetAll = function () {
+			modelManager.unsetAll(this.mid());
+		};
+		Model.prototype.reset = function (key) {
+			modelManager.reset(this.mid(), key);
+		};
+		Model.prototype.resetEach = function (keys) {
+			modelManager.resetEach(this.mid(), keys);
+		};
+		Model.prototype.resetAll = function () {
+			modelManager.resetAll(this.mid());
 		};
 
 		modelManager = new ModelManager();
