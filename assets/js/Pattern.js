@@ -452,17 +452,17 @@ var Pattern = (function () {
 		}());
 
 		function Model(pairs, idKey) {
+			this.mid = (function () {
+				var mid;
+				return function () {
+					return mid || (mid = createMID(createUID()));
+				};
+			}());
 			var mid = this.mid();
 			modelManager.prepare(mid, pairs);
 			if (idKey !== modelManager.getIDKey(mid)) modelManager.setIDKey(mid, idKey);
 			modelManager.manage(mid, this);
 		}
-		Model.prototype.mid = (function () {
-			var mid;
-			return function () {
-				return mid || (mid = createMID(createUID()));
-			};
-		}());
 		Model.prototype.get = function (key) {
 			return modelManager.get(this.mid(), key);
 		};
