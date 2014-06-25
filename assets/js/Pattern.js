@@ -71,10 +71,11 @@ var Pattern = (function () {
 				});
 			}
 			function raiseChangeEvent(mid, key) {
+				var KEY = key === "id" ? modelManager.getIDKey(mid) : key;
 				eventManager.raise("change", {
-					key: key,
-					currentValue: modelManager.getCurrentValue(mid, key),
-					changedValue: modelManager.getChangedValue(mid, key),
+					key: modelManager.getIDKey(mid) === key ? "id" : key,
+					currentValue: modelManager.getCurrentValue(mid, KEY),
+					changedValue: modelManager.getChangedValue(mid, KEY),
 					target: (modelManager.allModels())[mid]
 				});
 			}
@@ -231,22 +232,24 @@ var Pattern = (function () {
 			ModelManager.prototype.manage = function (mid, model) {
 				(this.allModels())[mid] = model;
 			};
-			ModelManager.prototype.getIDKey = function(mid) {
+			ModelManager.prototype.getIDKey = function (mid) {
 				return (this.allIdKeys())[mid] || "id";
 			};
-			ModelManager.prototype.setIDKey = function(mid, key) {
+			ModelManager.prototype.setIDKey = function (mid, key) {
 				if (typeof key === "string") (this.allIdKeys())[mid] = key;
 			};
 			ModelManager.prototype.get = function (mid, key) {
-				key = key === "id" ? this.getIDKey(mid) : key;
-				return this.getCurrentValue(mid, key);
+				var KEY = key === "id" ? this.getIDKey(mid) : key;
+				return this.getCurrentValue(mid, KEY);
 			};
 			ModelManager.prototype.getEach = function (mid, keys) {
-				var key, pairs;
+				var pairs, i, j, key, KEY;
 				if ((keys || false).constructor === Array) {
 					pairs = {};
-					while (key = keys.shift()) {
-						pairs[key] = this.get(mid, key);
+					for (i = 0, j = keys.length; i < j; i = i + 1) {
+						key = keys[i];
+						KEY = key === "id" ? this.getIDKey(mid) : key;
+						pairs[key] = this.getCurrentValue(mid, KEY);
 					}
 					return pairs;
 				}
@@ -255,167 +258,191 @@ var Pattern = (function () {
 				return this.export(this.currentValuesFor(mid));
 			};
 			ModelManager.prototype.set = function (mid, key, value) {
-				key = key === "id" ? this.getIDKey(mid) : key;
-				if (!this.isCurrentValue(mid, key, value)) {
-					if (this.validate(mid, key, value)) {
-						this.setChangedValue(mid, key, this.getCurrentValue(mid, key));
-						this.setCurrentValue(mid, key, value);
+				var KEY = key === "id" ? this.getIDKey(mid) : key;
+				if (!this.isCurrentValue(mid, KEY, value)) {
+					if (this.validate(mid, KEY, value)) {
+						this.setChangedValue(mid, KEY, this.getCurrentValue(mid, KEY));
+						this.setCurrentValue(mid, KEY, value);
 						raiseChangeEvent(mid, key);
 					}
 				}
 			};
 			ModelManager.prototype.setEach = function (mid, pairs) {
-				var key, value, changed;
+				var key, KEY, value, changedKeys;
 				if ((pairs || false).constructor === Object) {
+					changedKeys = [];
 					for (key in pairs) {
-						key = key === "id" ? this.getIDKey(mid) : key;
-						value = pairs[key];
-						if (!this.isCurrentValue(mid, key, value)) {
-							if (this.validate(mid, key, value)) {
-								this.setChangedValue(mid, key, this.getCurrentValue(mid, key));
-								this.setCurrentValue(mid, key, value);
+						KEY = key === "id" ? this.getIDKey(mid) : key;
+						value = pairs[key]; //use external key!
+						if (!this.isCurrentValue(mid, KEY, value)) {
+							if (this.validate(mid, KEY, value)) {
+								this.setChangedValue(mid, KEY, this.getCurrentValue(mid, KEY));
+								this.setCurrentValue(mid, KEY, value);
 								raiseChangeEvent(mid, key);
-								changed = true;
+								changedKeys.push(key);
 							}
 						}
 					}
-					if (changed) raiseSetEachEvent(mid, key);
+					if (changedKeys.length > 0) raiseSetEachEvent(mid, changedKeys);
 				}
 			};
 			ModelManager.prototype.setAll = function (mid, value) {
-				var key, pairs = this.currentValuesFor(mid), changed;
+				var key, pairs = this.currentValuesFor(mid), changedKeys = [];
 				for (key in pairs) {
-					key = key === "id" ? this.getIDKey(mid) : key;
 					if (!this.isCurrentValue(mid, key, value)) {
 						if (this.validate(mid, key, value)) {
 							this.setChangedValue(mid, key, this.getCurrentValue(mid, key));
 							this.setCurrentValue(mid, key, value);
-							raiseChangeEvent(mid, key);
-							changed = true;
+							raiseChangeEvent(mid, key, key);
+							changedKeys.push(key);
 						}
 					}
 				}
-				if (changed) raiseSetAllEvent(mid, key);
+				if (changedKeys.length > 0) raiseSetAllEvent(mid, changedKeys);
 			};
 			ModelManager.prototype.zed = function (mid, key) {
-				var value = this.getChangedValue(mid, key);
-				if (!this.isCurrentValue(mid, key, value)) {
-					this.setChangedValue(mid, key, this.getCurrentValue(mid, key));
-					this.setCurrentValue(mid, key, value);
+				var KEY = key === "id" ? this.getIDKey(mid) : key,
+					value = this.getChangedValue(mid, KEY);
+				if (!this.isCurrentValue(mid, KEY, value)) {
+					this.setChangedValue(mid, KEY, this.getCurrentValue(mid, KEY));
+					this.setCurrentValue(mid, KEY, value);
 					raiseChangeEvent(mid, key);
 				}
 			};
 			ModelManager.prototype.zedEach = function (mid, keys) {
-				var key, pairs = this.changedValuesFor(mid), value, changed;
+				var pairs, changedKeys, i, j, key, KEY, value;
 				if ((keys || false).constructor === Array) {
-					while (key = keys.shift()) {
-						//console.log(key, key in pairs, !this.isCurrentValue(mid, key, value));
-						if (key in pairs) { //can't zed unknown keys
-							value = pairs[key];
-							if (!this.isCurrentValue(mid, key, value)) {
-								this.setChangedValue(mid, key, this.getCurrentValue(mid, key));
-								this.setCurrentValue(mid, key, value);
+					pairs = this.changedValuesFor(mid);
+					changedKeys = [];
+					for (i = 0, j = keys.length; i < j; i = i + 1) {
+						key = keys[i];
+						KEY = key === "id" ? this.getIDKey(mid) : key;
+						if (KEY in pairs) { //can't zed unknown keys
+							value = pairs[KEY];
+							if (!this.isCurrentValue(mid, KEY, value)) {
+								this.setChangedValue(mid, KEY, this.getCurrentValue(mid, KEY));
+								this.setCurrentValue(mid, KEY, value);
 								raiseChangeEvent(mid, key);
-								changed = true;
+								changedKeys.push(key);
 							}
 						}
 					}
-					if (changed) raiseZedEachEvent(mid, keys);
+					if (changedKeys.length > 0) raiseZedEachEvent(mid, changedKeys);
 				}
 			};
 			ModelManager.prototype.zedAll = function (mid) {
-				var key, pairs = this.changedValuesFor(mid), value, changed;
+				var key, pairs = this.changedValuesFor(mid), value, changedKeys = [];
 				for (key in pairs) {
 					value = pairs[key]; //implicitly is changed
 					if (!this.isCurrentValue(mid, key, value)) {
 						this.setChangedValue(mid, key, this.getCurrentValue(mid, key));
 						this.setCurrentValue(mid, key, value);
 						raiseChangeEvent(mid, key);
-						changed = true;
+						changedKeys.push(key);
 					}
 				}
-				if (changed) raiseZedAllEvent(mid, key);
+				if (changedKeys.length > 0) raiseZedAllEvent(mid, changedKeys);
 			};
 			ModelManager.prototype.unset = function (mid, key) {
-				var pairs = this.currentValuesFor(mid), value;
-				if (key in pairs) {
-					value = pairs[key];
-					if (!this.isChangedValue(mid, key, value)) {
-						this.setChangedValue(mid, key, value);
+				var KEY = key === "id" ? this.getIDKey(mid) : key,
+					pairs = this.currentValuesFor(mid), value;
+				if (KEY in pairs) {
+					value = pairs[KEY];
+					if (!this.isChangedValue(mid, KEY, value)) {
+						this.setChangedValue(mid, KEY, value);
 					}
-					delete pairs[key];
+					delete pairs[KEY];
 					raiseChangeEvent(mid, key);
 				}
 			};
 			ModelManager.prototype.unsetEach = function (mid, keys) {
-				var key, pairs = this.currentValuesFor(mid), value, changed;
+				var pairs, changedKeys, i, j, key, KEY, value;
 				if ((keys || false).constructor === Array) {
-					while (key = keys.shift()) { //can't zed unknown keys
-						if (key in pairs) {
-							if (!this.isChangedValue(mid, key, value)) {
-								this.setChangedValue(mid, key, value);
+					pairs = this.currentValuesFor(mid);
+					changedKeys = [];
+					for (i = 0, j = keys.length; i < j; i = i + 1) {
+						key = keys[i];
+						KEY = key === "id" ? this.getIDKey(mid) : key;
+						if (KEY in pairs) { //can't zed unknown keys
+							value = pairs[KEY];
+							if (!this.isChangedValue(mid, KEY, value)) {
+								this.setChangedValue(mid, KEY, value);
 							}
-							delete pairs[key];
+							delete pairs[KEY];
 							raiseChangeEvent(mid, key);
-							changed = true;
+							changedKeys.push(key);
 						}
 					}
-					if (changed) raiseUnsetEachEvent(mid, keys);
+					if (changedKeys.length > 0) raiseUnsetEachEvent(mid, changedKeys);
 				}
 			};
 			ModelManager.prototype.unsetAll = function (mid) {
-				var pairs = this.currentValuesFor(mid), key, value, changed;
+				var key, pairs = this.currentValuesFor(mid), value, KEY = this.getIDKey(mid), changedKeys = [];
 				for (key in pairs) {
 					value = pairs[key];
 					if (!this.isChangedValue(mid, key, value)) {
 						this.setChangedValue(mid, key, value);
 					}
 					delete pairs[key];
+					//key === KEY ? "id" : key;
 					raiseChangeEvent(mid, key);
-					changed = true;
+					changedKeys.push(key);
 				}
-				if (changed) raiseUnsetAllEvent(mid);
+				if (changedKeys.length > 0) raiseUnsetAllEvent(mid, changedKeys);
 			};
 			ModelManager.prototype.reset = function (mid, key) {
-				var pairs = thid.defaultValuesFor(mid), value;
-				if (key in pairs) {
-					value = pairs[key];
-					if (!this.isCurrentValue(mid, key, value)) {
-						this.setChangedValue(mid, key, this.getCurrentValue(mid, key));
-						this.setCurrentValue(mid, key, value);
+				var KEY = key === "id" ? this.getIDKey(mid) : key,
+					pairs = this.defaultValuesFor(mid), value;
+				if (KEY in pairs) {
+					value = pairs[KEY];
+					if (!this.isCurrentValue(mid, KEY, value)) {
+						this.setChangedValue(mid, KEY, this.getCurrentValue(mid, KEY));
+						this.setCurrentValue(mid, KEY, value);
 						raiseChangeEvent(mid, key);
 					}
 				}
 			};
 			ModelManager.prototype.resetEach = function (mid, keys) {
-				var key, pairs = this.defaultValuesFor(mid), value, changed;
+				var pairs, changedKeys, i, j, key, KEY, value;
 				if ((keys || false).constructor === Array) {
-					while (key = keys.shift()) {
-						if (key in pairs) { //can't zed unknown keys
-							value = pairs[key];
-							if (!this.isCurrentValue(mid, key, value)) {
-								this.setChangedValue(mid, key, this.getCurrentValue(mid, key));
-								this.setCurrentValue(mid, key, value);
+					pairs = this.defaultValuesFor(mid);
+					changedKeys = [];
+					for (i = 0, j = keys.length; i < j; i = i + 1) {
+						key = keys[i];
+						KEY = key === "id" ? this.getIDKey(mid) : key;
+						if (KEY in pairs) { //can't zed unknown keys
+							value = pairs[KEY];
+							if (!this.isCurrentValue(mid, KEY, value)) {
+								this.setChangedValue(mid, KEY, this.getCurrentValue(mid, KEY));
+								this.setCurrentValue(mid, KEY, value);
 								raiseChangeEvent(mid, key);
-								changed = true;
+								changedKeys.push(key);
 							}
 						}
 					}
-					if (changed) raiseResetEachEvent(mid, keys);
+					if (changedKeys.length > 0) raiseResetEachEvent(mid, changedKeys);
 				}
 			};
 			ModelManager.prototype.resetAll = function (mid) {
-				var pairs = this.defaultValuesFor(mid), key, value, changed;
+				var pairs = this.defaultValuesFor(mid), key, value, KEY = this.getIDKey(mid), changedKeys = [];
 				for (key in pairs) {
 					value = pairs[key];
 					if (!this.isCurrentValue(mid, key, value)) {
 						this.setChangedValue(mid, key, this.getCurrentValue(mid, key));
 						this.setCurrentValue(mid, key, value);
+						//key === KEY ? "id" : key;
 						raiseChangeEvent(mid, key);
-						changed = true;
+						changedKeys.push(key);
 					}
 				}
-				if (changed) raiseResetAllEvent(mid);
+				if (changedKeys.length > 0) raiseResetAllEvent(mid, changedKeys);
+			};
+
+			ModelManager.prototype.restore = function (mid) {
+
+				/* reset defaults */
+				/* unset non-defaults */
+
 			};
 
 			eventManager = new EventManager();
@@ -480,6 +507,9 @@ var Pattern = (function () {
 		};
 		Model.prototype.resetAll = function () {
 			modelManager.resetAll(this.mid());
+		};
+		Model.prototype.restore = function () {
+			modelManager.restore(this.mid());
 		};
 
 		modelManager = new ModelManager();
