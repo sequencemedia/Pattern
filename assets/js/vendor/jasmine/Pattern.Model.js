@@ -308,7 +308,7 @@ describe("Pattern.Model", function () {
 	describe("Resetting values on an instance of the model", function () {
 
 		beforeEach(function () {
-			model = new Pattern.Model({ id: "ID", a: 1, b: {}, c: true }, "potatoes");
+			model = new Pattern.Model({ id: "ID", a: 1, b: {}, c: true });
 			model.setEach({ "id": "Changed ID", "a": 2, "b": null, "c": false, "x": 1 });
 		});
 
