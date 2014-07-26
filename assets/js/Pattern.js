@@ -130,7 +130,7 @@ var Pattern = (function () {
 					changed: changed,
 					model: (modelManager.allModels())[mid]
 				});
-			}
+			};
 			ModelManager.prototype.reportAll = function (eventType, mid, keys) {
 				var KEY, key,
 					changedValues = this.changedValuesFor(mid),
@@ -147,7 +147,7 @@ var Pattern = (function () {
 					changed: changed,
 					model: (modelManager.allModels())[mid]
 				});
-			}
+			};
 			ModelManager.prototype.initialize = function (mid, model, pairs, idKey) {
 				this.manage(mid, model);
 				var key, value, changedKeys = [];
