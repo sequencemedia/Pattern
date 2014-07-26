@@ -148,15 +148,18 @@ var Pattern = (function () {
 					model: (modelManager.allModels())[mid]
 				});
 			}
-			ModelManager.prototype.prepare = function (mid, pairs) {
-				var key, value;
+			ModelManager.prototype.initialize = function (mid, model, pairs, idKey) {
+				this.manage(mid, model);
+				var key, value, changedKeys = [];
 				for (key in pairs) {
 					value = pairs[key];
 					this.setDefaultValue(mid, key, value);
 					this.setChangedValue(mid, key, value);
 					this.setCurrentValue(mid, key, value);
+					changedKeys.push(key);
 				}
-				this.report("prepare", mid);
+				if (idKey !== this.getIDKey(mid)) this.setIDKey(mid, idKey);
+				this.reportAll("initialize", mid, changedKeys);
 			};
 			ModelManager.prototype.manage = function (mid, model) {
 				(this.allModels())[mid] = model;
@@ -399,18 +402,17 @@ var Pattern = (function () {
 
 		}());
 
-		function Model(pairs, idKey) {
-			this.mid = (function () {
-				var mid;
+		function initialize(pairs, idKey) {
+			this.mid = (function (mid) {
 				return function () {
-					return mid || (mid = createMID(createUID()));
+					return mid;
 				};
-			}());
-			var mid = this.mid();
-			modelManager.manage(mid, this);
-			modelManager.prepare(mid, pairs);
-			if (idKey !== modelManager.getIDKey(mid)) modelManager.setIDKey(mid, idKey);
+			}(createMID(createUID())));
+			modelManager.initialize(this.mid(), this, pairs, idKey);
+		}
 
+		function Model(pairs, idKey) {
+			initialize.call(this, pairs, idKey);
 		}
 		Model.prototype.get = function (key) {
 			return modelManager.get(this.mid(), key);
