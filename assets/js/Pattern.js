@@ -567,7 +567,7 @@ var Pattern = (function () {
 				this.manage(lid, modelList);
 				var pairs,
 					model,
-					key,
+					id,
 					mid,
 					allValues,
 					allModels,
@@ -580,11 +580,11 @@ var Pattern = (function () {
 					for (i = 0, j = pairsList.length; i < j; i = i + 1) {
 						pairs = pairsList[i];
 						model = new Model(pairs, idKey);
-						key = model.get("id");
+						id = model.get("id");
 						for (n = 0, m = allValues.length; n < m; n = n + 1) {
 							mid = allValues[n];
 							MODEL = allModels[mid];
-							if (MODEL.get("id") === key) {
+							if (MODEL.get("id") === id) {
 								allValues.splice(n, 1);
 								break;
 							}
