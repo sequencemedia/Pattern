@@ -591,7 +591,7 @@ var Pattern = (function () {
 						modelList.push(mid);
 					}
 				}
-			}
+			};
 
 			return ModelListManager;
 
