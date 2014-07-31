@@ -516,75 +516,81 @@ var Pattern = (function () {
 			ModelListManager.prototype.manage = function (lid, modelList) {
 				(this.allModelLists())[lid] = modelList;
 			};
-			ModelListManager.prototype.attributesFor = function (lid) {
+			ModelListManager.prototype.valuesFor = function (lid) {
 				var attributes = this.allAttributes();
-				return (attributes[lid] || (attributes[lid] = {}));
+				return (attributes[lid] || (attributes[lid] = []));
 			};
 			ModelListManager.prototype.get = function (lid, id) {
 				var mid,
-					attributes = this.attributesFor(lid),
+					allValues = this.valuesFor(lid),
 					allModels = modelStorage.allModels(),
-					MODEL;
-				for (mid in attributes) {
-					MODEL = allModels[mid];
-					if (MODEL.get("id") === id) {
-						return MODEL;
+					mod, i = 0, j = allValues.length;
+				do {
+					mid = allValues[i];
+					mod = allModels[mid];
+					if (mod.get("id") === id) {
+						return mod;
 					}
-				}
+				} while (++i < j);
 				return null;
 			};
 			ModelListManager.prototype.set = function (lid, id, model) {
 				var mid,
-					attributes = this.attributesFor(lid),
+					allValues = this.valuesFor(lid),
 					allModels = modelStorage.allModels(),
-					MODEL;
-				for (mid in attributes) {
-					MODEL = allModels[mid];
-					if (MODEL.get("id") === id) {
-						delete attributes[mid];
-						break;
+					mod, i = 0, j = allValues.length;
+				do {
+					mid = allValues[i];
+					mod = allModels[mid];
+					if (mod.get("id") === id) {
+						allValues.splice(i, 1);
+						return;
 					}
-				}
+				} while (++i < j);
 				mid = model.mid();
-				attributes[mid] = id;
+				allValues.push(mid);
 			};
 			ModelListManager.prototype.all = function (lid) {
 				var mid,
-					attributes = this.attributesFor(lid),
+					allValues = this.valuesFor(lid),
 					allModels = modelStorage.allModels(),
-					MODEL,
-					models = [];
-				for (mid in attributes) {
-					MODEL = allModels[mid];
-					models.push(MODEL);
-				}
-				return models;
+					mod, i = 0, j = allValues.length,
+					all = [];
+				do {
+					mid = allValues[i];
+					mod = allModels[mid];
+					all.push(mod);
+				} while (++i < j);
+				return all;
 			};
 			ModelListManager.prototype.initialize = function (lid, modelList, pairsList, idKey) {
 				this.manage(lid, modelList);
 				var pairs,
 					model,
-					id,
+					key,
 					mid,
-					attributes,
+					allValues,
 					allModels,
+					i, j,
+					n, m,
 					MODEL;
 				if ((pairsList || false).constructor === Array) {
-					attributes = this.attributesFor(lid);
+					allValues = this.valuesFor(lid);
 					allModels = modelStorage.allModels();
-					for (var i = 0, j = pairsList.length; i < j; i = i + 1) {
+					for (i = 0, j = pairsList.length; i < j; i = i + 1) {
 						pairs = pairsList[i];
 						model = new Model(pairs, idKey);
-						id = model.get("id");
-						for (mid in attributes) {
+						key = model.get("id");
+						for (n = 0, m = allValues.length; n < m; n = n + 1) {
+							mid = allValues[n];
 							MODEL = allModels[mid];
-							if (MODEL.get("id") === id) {
-								delete attributes[mid];
+							if (MODEL.get("id") === key) {
+								allValues.splice(n, 1);
 								break;
 							}
 						}
 						mid = model.mid();
-						attributes[mid] = id;
+						allValues.push(mid);
 					}
 				}
 			}
