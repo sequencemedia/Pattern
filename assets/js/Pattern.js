@@ -823,7 +823,7 @@ var Pattern = (function () {
 					lowerBound,
 					vid;
 				if (typeof index === "number") {
-					viewList = this.viewListFor(lid),
+					viewList = this.viewListFor(lid);
 					i = 0;
 					j = viewList.length;
 					vid = view.vid();
