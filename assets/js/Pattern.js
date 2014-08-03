@@ -579,7 +579,7 @@ var Pattern = (function () {
 					lowerBound,
 					mid;
 				if (typeof index === "number") {
-					modelList = this.modelListFor(lid),
+					modelList = this.modelListFor(lid);
 					i = 0;
 					j = modelList.length;
 					mid = model.mid();
@@ -630,13 +630,13 @@ var Pattern = (function () {
 					i = 0, j = modelList.length, all = [],
 					allModels,
 					mid,
-					MODEL;
+					model;
 				if (i < j) {
 					allModels = modelStorage.allModels();
 					do {
 						mid = modelList[i];
-						MODEL = allModels[mid];
-						all.push(MODEL);
+						model = allModels[mid];
+						all.push(model);
 					} while (++i < j);
 				}
 				return all;
@@ -874,13 +874,13 @@ var Pattern = (function () {
 					i = 0, j = viewList.length, all = [],
 					allViews,
 					vid,
-					VIEW;
+					view;
 				if (i < j) {
 					allViews = viewStorage.allViews();
 					do {
 						vid = viewList[i];
-						VIEW = allViews[vid];
-						all.push(VIEW);
+						view = allViews[vid];
+						all.push(view);
 					} while (++i < j);
 				}
 				return all;
