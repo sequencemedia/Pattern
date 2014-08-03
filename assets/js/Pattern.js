@@ -611,21 +611,18 @@ var Pattern = (function () {
 				}
 				modelList.push(mid);
 			};
-			ModelListManager.prototype.remove = function (lid, index) {
-				var modelList,
-					n,
-					upperBound,
-					lowerBound;
-				if (typeof index === "number") {
-					modelList = this.modelListFor(lid);
-					n = modelList.length;
-					if (n > 0) {
-						upperBound = n - 1; //no need to max() because n > 0
-						lowerBound = 0;
-						if (!(index > upperBound || index < lowerBound)) {
-							modelList.splice(index, 1);
+			ModelListManager.prototype.remove = function (lid, model) {
+				var modelList = this.modelListFor(lid),
+					i = 0, j = modelList.length,
+					mid;
+				if (i < j) {
+					mid = model.mid();
+					do {
+						if (modelList[i] === mid) {
+							modelList.splice(i, 1);
+							break;
 						}
-					}
+					} while (++i < j);
 				}
 			};
 			ModelListManager.prototype.all = function (lid) {
@@ -702,8 +699,8 @@ var Pattern = (function () {
 		ModelList.prototype.add = function (model) {
 			modelListManager.add(this.lid(), model);
 		};
-		ModelList.prototype.remove = function (index) {
-			modelListManager.remove(this.lid(), index);
+		ModelList.prototype.remove = function (model) {
+			modelListManager.remove(this.lid(), model);
 		};
 		//ModelList.prototype.addEach = function (byModel) { };
 		//ModelList.prototype.removeEach = function (byIndex) { };
@@ -858,21 +855,18 @@ var Pattern = (function () {
 				}
 				viewList.push(vid);
 			};
-			ViewListManager.prototype.remove = function (lid, index) {
-				var viewList,
-					n,
-					upperBound,
-					lowerBound;
-				if (typeof index === "number") {
-					viewList = this.viewListFor(lid);
-					n = viewList.length;
-					if (n > 0) {
-						upperBound = n - 1; //no need to max() because n > 0
-						lowerBound = 0;
-						if (!(index > upperBound || index < lowerBound)) {
-							viewList.splice(index, 1);
+			ViewListManager.prototype.remove = function (lid, view) {
+				var viewList = this.viewListFor(lid),
+					i = 0, j = viewList.length,
+					vid;
+				if (i < j) {
+					vid = view.vid();
+					do {
+						if (viewList[i] === vid) {
+							viewList.splice(i, 1);
+							break;
 						}
-					}
+					} while (++i < j);
 				}
 			};
 			ViewListManager.prototype.all = function (lid) {
