@@ -247,7 +247,7 @@ var Pattern = (function () {
 				}
 			};
 			ModelManager.prototype.getAll = function (mid) {
-				var currentValues = this.currentValuesFor(mid), key, KEY, value, pairs = {};
+				var currentValues = this.currentValuesFor(mid), key, KEY, pairs = {};
 				for (key in currentValues) {
 					KEY = key === "id" ? this.getIDKey(mid) : key;
 					pairs[key] = currentValues[KEY];
@@ -551,90 +551,124 @@ var Pattern = (function () {
 				var attributes = this.allAttributes();
 				return (attributes[lid] || (attributes[lid] = []));
 			};
-			ModelListManager.prototype.get = function (lid, id) {
-				var modelList = this.modelListFor(lid),
-					i = 0, j = modelList.length,
-					allModels,
-					mid,
-					MODEL;
-				if (i === j) return null;
-				allModels = modelStorage.allModels();
-				do {
-					mid = modelList[i];
-					MODEL = allModels[mid];
-					if (MODEL.get("id") === id) {
-						return MODEL;
+			ModelListManager.prototype.get = function (lid, index) {
+				var modelList,
+					i, j,
+					upperBound,
+					lowerBound,
+					mid;
+				if (typeof index === "number") {
+					modelList = this.modelListFor(lid);
+					i = 0;
+					j = modelList.length;
+					if (i < j) {
+						upperBound = j - 1;
+						lowerBound = 0;
+						if (!(index > upperBound || index < lowerBound)) {
+							mid = modelList[index];
+							return (modelStorage.allModels())[mid];
+						}
 					}
-				} while (++i < j);
+				}
 				return null;
 			};
-			ModelListManager.prototype.set = function (lid, id, model) {
-				var mid,
+			ModelListManager.prototype.set = function (lid, index, model) {
+				var modelList,
+					i, j,
+					upperBound,
+					lowerBound,
+					mid;
+				if (typeof index === "number") {
 					modelList = this.modelListFor(lid),
-					allModels = modelStorage.allModels(),
-					MODEL, i = 0, j = modelList.length;
-				do {
-					mid = modelList[i];
-					MODEL = allModels[mid];
-					if (MODEL.get("id") === id) {
-						modelList.splice(i, 1);
-						return;
+					i = 0;
+					j = modelList.length;
+					mid = model.mid();
+					if (i === j) {
+						modelList.push(mid);
+					} else {
+						upperBound = j - 1; //no need to max() because j > 0
+						lowerBound = 0;
+						index = index > upperBound ? j : index < lowerBound ? lowerBound : index ;
+						do {
+							if (modelList[i] === mid) {
+								if (i === index) return ;
+								modelList.splice(i, 1);
+								break;
+							}
+						} while (++i < j);
+						modelList.splice(index, 0, mid);
 					}
-				} while (++i < j);
-				mid = model.mid();
+				}
+			};
+			ModelListManager.prototype.add = function (lid, model) {
+				var modelList = this.modelListFor(lid),
+					i = 0, j = modelList.length,
+					mid = model.mid();
+				if (i < j) {
+					do {
+						if (modelList[i] === mid) return ;
+					} while (++i < j);
+				}
 				modelList.push(mid);
 			};
-			ModelListManager.prototype.add = function (lid, model) { };
-			ModelListManager.prototype.remove = function (lid, model) { };
+			ModelListManager.prototype.remove = function (lid, index) {
+				var modelList,
+					n,
+					upperBound,
+					lowerBound;
+				if (typeof index === "number") {
+					modelList = this.modelListFor(lid);
+					n = modelList.length;
+					if (n > 0) {
+						upperBound = n - 1; //no need to max() because n > 0
+						lowerBound = 0;
+						if (!(index > upperBound || index < lowerBound)) {
+							modelList.splice(index, 1);
+						}
+					}
+				}
+			};
 			ModelListManager.prototype.all = function (lid) {
 				var modelList = this.modelListFor(lid),
 					i = 0, j = modelList.length, all = [],
 					allModels,
 					mid,
 					MODEL;
-				if (i === j) return all;
-				allModels = modelStorage.allModels();
-				do {
-					mid = modelList[i];
-					MODEL = allModels[mid];
-					all.push(MODEL);
-				} while (++i < j);
+				if (i < j) {
+					allModels = modelStorage.allModels();
+					do {
+						mid = modelList[i];
+						MODEL = allModels[mid];
+						all.push(MODEL);
+					} while (++i < j);
+				}
 				return all;
 			};
 			ModelListManager.prototype.indexOf = function (lid, model) {
-				var mid = model.mid(),
-					modelList = this.modelListFor(lid),
-					i = 0, j = modelList.length;
-				do {
-					if (modelList[i] === mid) return i;
-				} while (++i < j);
+				var modelList = this.modelListFor(lid),
+					i = 0, j = modelList.length,
+					mid;
+				if (i < j) {
+					mid = model.mid();
+					do {
+						if (modelList[i] === mid) return i;
+					} while (++i < j);
+				}
 				return -1;
 			};
 			ModelListManager.prototype.initialize = function (lid, pairsList, idKey) {
 				var pairs,
 					model,
-					id,
 					mid,
 					modelList,
 					allModels,
-					i, j,
-					n, m,
-					MODEL;
+					i, j;
 				if ((pairsList || false).constructor === Array) {
 					modelList = this.modelListFor(lid);
 					allModels = modelStorage.allModels();
 					for (i = 0, j = pairsList.length; i < j; i = i + 1) {
 						pairs = pairsList[i];
 						model = new Model(pairs, idKey);
-						id = model.get("id");
-						for (n = 0, m = modelList.length; n < m; n = n + 1) {
-							mid = modelList[n];
-							MODEL = allModels[mid];
-							if (MODEL.get("id") === id) {
-								modelList.splice(n, 1);
-								break;
-							}
-						}
 						mid = model.mid();
 						modelList.push(mid);
 					}
@@ -659,20 +693,20 @@ var Pattern = (function () {
 		function ModelList(pairsList, idKey) {
 			initialize.call(this, pairsList, idKey);
 		}
-		ModelList.prototype.get = function (id) {
-			return modelListManager.get(this.lid(), id);
+		ModelList.prototype.get = function (index) {
+			return modelListManager.get(this.lid(), index);
 		};
-		ModelList.prototype.set = function (id, model) {
-			modelListManager.set(this.lid(), id, model);
+		ModelList.prototype.set = function (index, model) {
+			modelListManager.set(this.lid(), index, model);
 		};
 		ModelList.prototype.add = function (model) {
 			modelListManager.add(this.lid(), model);
 		};
-		ModelList.prototype.remove = function (model) {
-			modelListManager.remove(this.lid(), model);
+		ModelList.prototype.remove = function (index) {
+			modelListManager.remove(this.lid(), index);
 		};
-		ModelList.prototype.addEach = function (ids) { };
-		ModelList.prototype.removeEach = function (ids) { };
+		//ModelList.prototype.addEach = function (byModel) { };
+		//ModelList.prototype.removeEach = function (byIndex) { };
 		ModelList.prototype.all = function () {
 			return modelListManager.all(this.lid());
 		};
@@ -766,16 +800,24 @@ var Pattern = (function () {
 			};
 			ViewListManager.prototype.get = function (lid, index) {
 				var viewList,
+					i, j,
 					upperBound,
 					lowerBound,
 					vid;
-				if (typeof index !== "number") return null ;
-				viewList = this.viewListFor(lid);
-				upperBound = viewList.length - 1;
-				lowerBound = 0;
-				if (index > upperBound || index < lowerBound) return null;
-				vid = viewList[index];
-				return (viewStorage.allViews())[vid];
+				if (typeof index === "number") {
+					viewList = this.viewListFor(lid);
+					i = 0;
+					j = viewList.length;
+					if (i < j) {
+						upperBound = j - 1;
+						lowerBound = 0;
+						if (!(index > upperBound || index < lowerBound)) {
+							vid = viewList[index];
+							return (viewStorage.allViews())[vid];
+						}
+					}
+				}
+				return null;
 			};
 			ViewListManager.prototype.set = function (lid, index, view) {
 				var viewList,
@@ -783,26 +825,27 @@ var Pattern = (function () {
 					upperBound,
 					lowerBound,
 					vid;
-				if (typeof index !== "number") return ;
-				viewList = this.viewListFor(lid),
-				i = 0;
-				j = viewList.length;
-				vid = view.vid();
-				if (i < j) {
-					upperBound = Math.max(j - 1, 0);
-					lowerBound = 0;
-					index = index > upperBound ? j : index < lowerBound ? lowerBound : index ;
-					do {
-						if (viewList[i] === vid) {
-							if (i === index) return ;
-							viewList.splice(i, 1);
-							break;
-						}
-					} while (++i < j);
-					viewList.splice(index, 0, vid);
-					return ;
+				if (typeof index === "number") {
+					viewList = this.viewListFor(lid),
+					i = 0;
+					j = viewList.length;
+					vid = view.vid();
+					if (i === j) {
+						viewList.push(vid);
+					} else {
+						upperBound = j - 1;
+						lowerBound = 0;
+						index = index > upperBound ? j : index < lowerBound ? lowerBound : index ;
+						do {
+							if (viewList[i] === vid) {
+								if (i === index) return ;
+								viewList.splice(i, 1);
+								break;
+							}
+						} while (++i < j);
+						viewList.splice(index, 0, vid);
+					}
 				}
-				viewList.push(vid);
 			};
 			ViewListManager.prototype.add = function (lid, view) {
 				var viewList = this.viewListFor(lid),
@@ -820,14 +863,16 @@ var Pattern = (function () {
 					n,
 					upperBound,
 					lowerBound;
-				if (typeof index !== "number") return ;
-				viewList = this.viewListFor(lid);
-				n = viewList.length;
-				if (n > 0) {
-					upperBound = n - 1; //no need to max() because n > 0
-					lowerBound = 0;
-					if (index > upperBound || index < lowerBound) return ;
-					viewList.splice(index, 1);
+				if (typeof index === "number") {
+					viewList = this.viewListFor(lid);
+					n = viewList.length;
+					if (n > 0) {
+						upperBound = n - 1; //no need to max() because n > 0
+						lowerBound = 0;
+						if (!(index > upperBound || index < lowerBound)) {
+							viewList.splice(index, 1);
+						}
+					}
 				}
 			};
 			ViewListManager.prototype.all = function (lid) {
