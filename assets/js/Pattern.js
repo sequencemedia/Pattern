@@ -4,6 +4,8 @@ var Pattern = (function () {
 
 	var Model,
 		ModelList,
+		View,
+		ViewList,
 		createUID;
 
 	function createLID(uid) { return "lid-" + uid; }
@@ -34,7 +36,11 @@ var Pattern = (function () {
 	var ModelStorage,
 		modelStorage,
 		ModelListStorage,
-		modelListStorage;
+		modelListStorage,
+		ViewStorage,
+		viewStorage,
+		ViewListStorage,
+		viewListStorage;
 
 	ModelStorage = (function () {
 
@@ -59,6 +65,32 @@ var Pattern = (function () {
 		}
 
 		return ModelListStorage;
+
+	}());
+
+	ViewStorage = (function () {
+
+		function ViewStorage() {
+			var views = {};
+			this.allViews = function () {
+				return views;
+			};
+		}
+
+		return ViewStorage;
+
+	}());
+
+	ViewListStorage = (function () {
+
+		function ViewListStorage() {
+			var viewLists = {};
+			this.allViewLists = function () {
+				return viewLists;
+			};
+		}
+
+		return ViewListStorage;
 
 	}());
 
@@ -520,10 +552,13 @@ var Pattern = (function () {
 				return (attributes[lid] || (attributes[lid] = []));
 			};
 			ModelListManager.prototype.get = function (lid, id) {
-				var mid,
-					modelList = this.modelListFor(lid),
-					allModels = modelStorage.allModels(),
-					MODEL, i = 0, j = modelList.length;
+				var modelList = this.modelListFor(lid),
+					i = 0, j = modelList.length,
+					allModels,
+					mid,
+					MODEL;
+				if (i === j) return null;
+				allModels = modelStorage.allModels();
 				do {
 					mid = modelList[i];
 					MODEL = allModels[mid];
@@ -549,18 +584,31 @@ var Pattern = (function () {
 				mid = model.mid();
 				modelList.push(mid);
 			};
+			ModelListManager.prototype.add = function (lid, model) { };
+			ModelListManager.prototype.remove = function (lid, model) { };
 			ModelListManager.prototype.all = function (lid) {
-				var mid,
-					modelList = this.modelListFor(lid),
-					allModels = modelStorage.allModels(),
-					MODEL, i = 0, j = modelList.length,
-					all = [];
+				var modelList = this.modelListFor(lid),
+					i = 0, j = modelList.length, all = [],
+					allModels,
+					mid,
+					MODEL;
+				if (i === j) return all;
+				allModels = modelStorage.allModels();
 				do {
 					mid = modelList[i];
 					MODEL = allModels[mid];
 					all.push(MODEL);
 				} while (++i < j);
 				return all;
+			};
+			ModelListManager.prototype.indexOf = function (lid, model) {
+				var mid = model.mid(),
+					modelList = this.modelListFor(lid),
+					i = 0, j = modelList.length;
+				do {
+					if (modelList[i] === mid) return i;
+				} while (++i < j);
+				return -1;
 			};
 			ModelListManager.prototype.initialize = function (lid, pairsList, idKey) {
 				var pairs,
@@ -617,13 +665,20 @@ var Pattern = (function () {
 		ModelList.prototype.set = function (id, model) {
 			modelListManager.set(this.lid(), id, model);
 		};
+		ModelList.prototype.add = function (model) {
+			modelListManager.add(this.lid(), model);
+		};
+		ModelList.prototype.remove = function (model) {
+			modelListManager.remove(this.lid(), model);
+		};
+		ModelList.prototype.addEach = function (ids) { };
+		ModelList.prototype.removeEach = function (ids) { };
 		ModelList.prototype.all = function () {
 			return modelListManager.all(this.lid());
 		};
-		ModelList.prototype.add = function (id, model) { };
-		ModelList.prototype.remove = function (id) { };
-		ModelList.prototype.addEach = function (ids) { };
-		ModelList.prototype.removeEach = function (ids) { };
+		ModelList.prototype.indexOf = function (model) {
+			return modelListManager.indexOf(this.lid(), model);
+		};
 
 		modelListManager = new ModelListManager();
 
@@ -631,18 +686,258 @@ var Pattern = (function () {
 
 	}());
 
-	function View(model) {
-	}
+	View = (function () {
 
-	function ViewList(modelList) { }
-	ViewList.prototype.add = function () { };
-	ViewList.prototype.remove = function () { };
+		var ViewManager,
+			viewManager;
 
-	function Controller() {
-	}
+		ViewManager = (function () {
+
+			function ViewManager() {
+				var attributes = {};
+				this.allAttributes = function () {
+					return attributes;
+				};
+			}
+			ViewManager.prototype.allViews = function () {
+				return viewStorage.allViews();
+			};
+			ViewManager.prototype.manage = function (vid, view) {
+				(this.allViews())[vid] = view;
+			};
+			ViewManager.prototype.initialize = function (vid, model) {
+				if (model instanceof Model) {
+
+				}
+			};
+
+			return ViewManager;
+
+		}());
+
+		function initialize(model) {
+			var vid;
+			this.vid = (function (vid) {
+				return function () {
+					return vid;
+				};
+			}(vid = createVID(createUID())));
+			viewManager.manage(vid, this);
+			viewManager.initialize(vid, model);
+		}
+
+		function View(model) {
+			initialize.call(this, model);
+		}
+		/*
+		View.prototype.model = function () {
+
+		};
+		*/
+
+		viewManager = new ViewManager();
+
+		return View;
+
+	}());
+
+	ViewList = (function () {
+
+		var ViewListManager,
+			viewListManager;
+
+		ViewListManager = (function () {
+
+			function ViewListManager() {
+				var attributes = {};
+				this.allAttributes = function () {
+					return attributes;
+				};
+			}
+			ViewListManager.prototype.allViewLists = function () {
+				return viewListStorage.allViewLists();
+			};
+			ViewListManager.prototype.manage = function (lid, viewList) {
+				(this.allViewLists())[lid] = viewList;
+			};
+			ViewListManager.prototype.viewListFor = function (lid) {
+				var attributes = this.allAttributes();
+				return (attributes[lid] || (attributes[lid] = []));
+			};
+			ViewListManager.prototype.get = function (lid, index) {
+				var viewList,
+					upperBound,
+					lowerBound,
+					vid;
+				if (typeof index !== "number") return null ;
+				viewList = this.viewListFor(lid);
+				upperBound = viewList.length - 1;
+				lowerBound = 0;
+				if (index > upperBound || index < lowerBound) return null;
+				vid = viewList[index];
+				return (viewStorage.allViews())[vid];
+			};
+			ViewListManager.prototype.set = function (lid, index, view) {
+				var viewList,
+					i, j,
+					upperBound,
+					lowerBound,
+					vid;
+				if (typeof index !== "number") return ;
+				viewList = this.viewListFor(lid),
+				i = 0;
+				j = viewList.length;
+				vid = view.vid();
+				if (i < j) {
+					upperBound = Math.max(j - 1, 0);
+					lowerBound = 0;
+					index = index > upperBound ? j : index < lowerBound ? lowerBound : index ;
+					do {
+						if (viewList[i] === vid) {
+							if (i === index) return ;
+							viewList.splice(i, 1);
+							break;
+						}
+					} while (++i < j);
+					viewList.splice(index, 0, vid);
+					return ;
+				}
+				viewList.push(vid);
+			};
+			ViewListManager.prototype.add = function (lid, view) {
+				var viewList = this.viewListFor(lid),
+					i = 0, j = viewList.length,
+					vid = view.vid();
+				if (i < j) {
+					do {
+						if (viewList[i] === vid) return ;
+					} while (++i < j);
+				}
+				viewList.push(vid);
+			};
+			ViewListManager.prototype.remove = function (lid, index) {
+				var viewList,
+					n,
+					upperBound,
+					lowerBound;
+				if (typeof index !== "number") return ;
+				viewList = this.viewListFor(lid);
+				n = viewList.length;
+				if (n > 0) {
+					upperBound = n - 1; //no need to max() because n > 0
+					lowerBound = 0;
+					if (index > upperBound || index < lowerBound) return ;
+					viewList.splice(index, 1);
+				}
+			};
+			ViewListManager.prototype.all = function (lid) {
+				var viewList = this.viewListFor(lid),
+					i = 0, j = viewList.length, all = [],
+					allViews,
+					vid,
+					VIEW;
+				if (i < j) {
+					allViews = viewStorage.allViews();
+					do {
+						vid = viewList[i];
+						VIEW = allViews[vid];
+						all.push(VIEW);
+					} while (++i < j);
+				}
+				return all;
+			};
+			ViewListManager.prototype.indexOf = function (lid, view) {
+				var viewList = this.viewListFor(lid),
+					i = 0, j = viewList.length,
+					vid;
+				if (i < j) {
+					vid = view.vid();
+					do {
+						if (viewList[i] === vid) return i;
+					} while (++i < j);
+				}
+				return -1;
+			};
+			ViewListManager.prototype.initialize = function (lid, modelList) {
+				var viewList,
+					allModels,
+					i, j,
+					model,
+					view,
+					vid;
+				if (modelList instanceof ModelList) {
+					viewList = this.viewListFor(lid);
+					allModels = modelList.all();
+					for (i = 0, j = allModels.length; i < j; i = i + 1) {
+						model = allModels[i];
+						view = new View(model);
+						vid = view.vid();
+						viewList.push(vid);
+					}
+				}
+			};
+			/*
+			ViewList.prototype.modelList = function () {
+
+			};
+			*/
+
+			return ViewListManager;
+
+		}());
+
+		function initialize(modelList) {
+			var lid;
+			this.lid = (function (lid) {
+				return function () {
+					return lid;
+				};
+			}(lid = createLID(createUID())));
+			viewListManager.manage(lid, this);
+			viewListManager.initialize(lid, modelList);
+		}
+
+		function ViewList(modelList) {
+			initialize.call(this, modelList);
+		}
+		ViewList.prototype.get = function (index) {
+			return viewListManager.get(this.lid(), index);
+		};
+		ViewList.prototype.set = function (index, view) {
+			viewListManager.set(this.lid(), index, view);
+		};
+		ViewList.prototype.add = function (view) {
+			viewListManager.add(this.lid(), view);
+		};
+		ViewList.prototype.remove = function (view) {
+			viewListManager.remove(this.lid(), view);
+		};
+		ViewList.prototype.all = function () {
+			return viewListManager.all(this.lid());
+		};
+		ViewList.prototype.indexOf = function (view) {
+			return viewListManager.indexOf(this.lid(), view);
+		};
+
+		viewListManager = new ViewListManager();
+
+		return ViewList;
+
+	}());
+
+	function Controller() {}
 
 	modelStorage = new ModelStorage();
 	modelListStorage = new ModelListStorage();
+	viewStorage = new ViewStorage();
+	viewListStorage = new ViewListStorage();
+
+	window.pattern = {
+		modelStorage: modelStorage,
+		modelListStorage: modelListStorage,
+		viewStorage: viewStorage,
+		viewListStorage: viewListStorage
+	};
 
 	return {
 
