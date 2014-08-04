@@ -473,6 +473,32 @@ var Pattern = (function () {
 			modelManager.initialize(mid, pairs, idKey);
 		}
 
+		function descendant(pairs, idKey) {
+			function mix(alpha, omega) {
+				var key, has = Object.prototype.hasOwnProperty;
+				for (key in alpha) {
+					if (has.call(alpha, key)) {
+						if ((key in omega) === false) {
+							omega[key] = alpha[key];
+						}
+					}
+				}
+			}
+			return (function (Ancestor, ancestorPairs, ancestorIdKey) {
+				var ancestor = new Ancestor(ancestorPairs, ancestorIdKey);
+				function Model(pairs, idKey) {
+					mix(ancestorPairs, pairs);
+					initialize.call(this, pairs, idKey || ancestorIdKey);
+				}
+				Model.prototype = ancestor;
+				Model.prototype.ancestor = function () {
+					return ancestor;
+				};
+				mix(Ancestor, Model);
+				return Model;
+			}(this, pairs, idKey));
+		}
+
 		function Model(pairs, idKey) {
 			initialize.call(this, pairs, idKey);
 		}
@@ -521,6 +547,7 @@ var Pattern = (function () {
 		Model.prototype.resetAll = function () {
 			modelManager.resetAll(this.mid());
 		};
+		Model.descendant = descendant;
 
 		modelManager = new ModelManager();
 
@@ -687,6 +714,48 @@ var Pattern = (function () {
 			modelListManager.initialize(lid, pairsList, idKey);
 		}
 
+		function descendant(pairsList, idKey) {
+			function mixList(alpha, omega) {
+				function has(array, value) {
+					var i = 0, j = array.length;
+					do {
+						if (array[i] === value) return true ;
+					} while (++i < j);
+					return false;
+				}
+				var i, j, value;
+				for (i = 0, j = alpha.length; i < j; i = i + 1) {
+					value = alpha[i];
+					if (has(omega, value) === false) {
+						omega.push(value);
+					}
+				}
+			}
+			function mix(alpha, omega) {
+				var key, has = Object.prototype.hasOwnProperty;
+				for (key in alpha) {
+					if (has.call(alpha, key)) {
+						if ((key in omega) === false) {
+							omega[key] = alpha[key];
+						}
+					}
+				}
+			}
+			return (function (Ancestor, ancestorPairsList, ancestorIdKey) {
+				var ancestor = new Ancestor(ancestorPairsList, ancestorIdKey);
+				function ModelList(pairsList, idKey) {
+					mixList(ancestorPairsList, pairsList);
+					initialize.call(this, pairsList, idKey || ancestorIdKey);
+				}
+				ModelList.prototype = ancestor;
+				ModelList.prototype.ancestor = function () {
+					return ancestor;
+				};
+				mix(Ancestor, ModelList);
+				return ModelList;
+			}(this, pairsList, idKey));
+		}
+
 		function ModelList(pairsList, idKey) {
 			initialize.call(this, pairsList, idKey);
 		}
@@ -710,6 +779,7 @@ var Pattern = (function () {
 		ModelList.prototype.indexOf = function (model) {
 			return modelListManager.indexOf(this.lid(), model);
 		};
+		ModelList.descendant = descendant;
 
 		modelListManager = new ModelListManager();
 
@@ -971,12 +1041,14 @@ var Pattern = (function () {
 	viewStorage = new ViewStorage();
 	viewListStorage = new ViewListStorage();
 
+	/*
 	window.pattern = {
 		modelStorage: modelStorage,
 		modelListStorage: modelListStorage,
 		viewStorage: viewStorage,
 		viewListStorage: viewListStorage
 	};
+	*/
 
 	return {
 
