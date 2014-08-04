@@ -716,6 +716,7 @@ var Pattern = (function () {
 
 		function descendant(pairsList, idKey) {
 			function mixList(alpha, omega) {
+				var i, j, value;
 				function has(array, value) {
 					var i = 0, j = array.length;
 					do {
@@ -723,7 +724,6 @@ var Pattern = (function () {
 					} while (++i < j);
 					return false;
 				}
-				var i, j, value;
 				for (i = 0, j = alpha.length; i < j; i = i + 1) {
 					value = alpha[i];
 					if (has(omega, value) === false) {
