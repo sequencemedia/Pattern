@@ -433,6 +433,9 @@ var Pattern = (function () {
 				return attributes;
 			};
 		}
+		ModelListManager.prototype.allModels = function () {
+			return modelStorage.allModels();
+		};
 		ModelListManager.prototype.allModelLists = function () {
 			return modelListStorage.allModelLists();
 		};
@@ -458,7 +461,7 @@ var Pattern = (function () {
 					lowerBound = 0;
 					if (!(index > upperBound || index < lowerBound)) {
 						mid = modelList[index];
-						return (modelStorage.allModels())[mid];
+						return (this.allModels())[mid];
 					}
 				}
 			}
@@ -509,7 +512,7 @@ var Pattern = (function () {
 				mid,
 				model;
 			if ((array || false).constructor === Array) {
-				modelList = this.modelListFor(lid),
+				modelList = this.modelListFor(lid);
 				i = 0;
 				j = modelList.length;
 				if (i < j) {
@@ -539,7 +542,7 @@ var Pattern = (function () {
 				mid,
 				model;
 			if ((array || false).constructor === Array) {
-				modelList = this.modelListFor(lid),
+				modelList = this.modelListFor(lid);
 				i = 0;
 				j = modelList.length;
 				if (i < j) {
@@ -554,7 +557,7 @@ var Pattern = (function () {
 				mid,
 				model;
 			if (i < j) {
-				allModels = modelStorage.allModels();
+				allModels = this.allModels();
 				do {
 					mid = modelList[i];
 					model = allModels[mid];
@@ -563,6 +566,26 @@ var Pattern = (function () {
 			}
 			return all;
 		};
+		ModelListManager.prototype.mix = (function () {
+			function hasValue(array, value) {
+				var i = 0, j = array.length;
+				do {
+					if (array[i] === value) return true ;
+				} while (++i < j);
+				return false;
+			}
+			return function (alpha, omega) { //lid, lid
+				var alphaList = this.modelListFor(alpha),
+					omegaList = this.modelListFor(omega),
+					n = alphaList.length, mid;
+				while (n--) { //reverse and unshift
+					mid = alphaList[n];
+					if (hasValue(omegaList, mid) === false) {
+						omegaList.unshift(mid);
+					}
+				}
+			};
+		}());
 		ModelListManager.prototype.indexOf = function (lid, model) {
 			var modelList = this.modelListFor(lid),
 				i = 0, j = modelList.length,
@@ -584,7 +607,7 @@ var Pattern = (function () {
 				i, j;
 			if ((pairsList || false).constructor === Array) {
 				modelList = this.modelListFor(lid);
-				allModels = modelStorage.allModels();
+				allModels = this.allModels();
 				for (i = 0, j = pairsList.length; i < j; i = i + 1) {
 					pairs = pairsList[i];
 					model = new Model(pairs, idKey);
@@ -811,6 +834,33 @@ var Pattern = (function () {
 
 	Model = (function () {
 
+		var descendant = (function () {
+			var hasKey = Object.prototype.hasOwnProperty;
+			function mix(alpha, omega) {
+				var key;
+				for (key in alpha) {
+					if (hasKey.call(alpha, key) === true) {
+						if (hasKey.call(omega, key) === false) {
+							omega[key] = alpha[key];
+						}
+					}
+				}
+				return omega;
+			}
+			return function (pairs, idKey) {
+				return (function (ancestor, ancestorPairs, ancestorIdKey) {
+					function Model(pairs, idKey) {
+						this.ancestor = function () {
+							return ancestor;
+						};
+						initialize.call(this, (ancestorPairs || false).constructor === Object ? (pairs || false).constructor === Object ? mix(ancestorPairs, pairs) : ancestorPairs : pairs, idKey || ancestorIdKey);
+					}
+					Model.prototype = ancestor;
+					return mix(ancestor.constructor, Model);
+				}(this instanceof Model ? this : new this(pairs, idKey), pairs, idKey));
+			};
+		}());
+
 		function initialize(pairs, idKey) {
 			var mid;
 			this.mid = (function (mid) {
@@ -820,31 +870,6 @@ var Pattern = (function () {
 			}(mid = createMID(createUID())));
 			modelManager.manage(mid, this);
 			modelManager.initialize(mid, pairs, idKey);
-		}
-
-		function descendant(pairs, idKey) {
-			function mix(alpha, omega) {
-				var key, has = Object.prototype.hasOwnProperty;
-				for (key in alpha) {
-					if (has.call(alpha, key)) {
-						if ((key in omega) === false) {
-							omega[key] = alpha[key];
-						}
-					}
-				}
-				return omega;
-			}
-			return (function (Ancestor, ancestorPairs, ancestorIdKey) {
-				var ancestor = new Ancestor(ancestorPairs, ancestorIdKey);
-				function Model(pairs, idKey) {
-					initialize.call(this, (ancestorPairs || false).constructor === Object ? (pairs || false).constructor === Object ? mix(ancestorPairs, pairs) : ancestorPairs : pairs, idKey || ancestorIdKey);
-				}
-				Model.prototype = ancestor;
-				Model.prototype.ancestor = function () {
-					return ancestor;
-				};
-				return mix(Ancestor, Model);
-			}(this, pairs, idKey));
 		}
 
 		function Model(pairs, idKey) {
@@ -895,6 +920,8 @@ var Pattern = (function () {
 		Model.prototype.resetAll = function () {
 			modelManager.resetAll(this.mid());
 		};
+		Model.prototype.descendant = descendant;
+
 		Model.descendant = descendant;
 
 		return Model;
@@ -912,48 +939,6 @@ var Pattern = (function () {
 			}(lid = createLID(createUID())));
 			modelListManager.manage(lid, this);
 			modelListManager.initialize(lid, pairsList, idKey);
-		}
-
-		function descendant(pairsList, idKey) {
-			function mixList(alpha, omega) {
-				var i, j, value;
-				function has(array, value) {
-					var i = 0, j = array.length;
-					do {
-						if (array[i] === value) return true ;
-					} while (++i < j);
-					return false;
-				}
-				for (i = 0, j = alpha.length; i < j; i = i + 1) {
-					value = alpha[i];
-					if (has(omega, value) === false) {
-						omega.push(value);
-					}
-				}
-				return omega;
-			}
-			function mix(alpha, omega) {
-				var key, has = Object.prototype.hasOwnProperty;
-				for (key in alpha) {
-					if (has.call(alpha, key)) {
-						if ((key in omega) === false) {
-							omega[key] = alpha[key];
-						}
-					}
-				}
-				return omega;
-			}
-			return (function (Ancestor, ancestorPairsList, ancestorIdKey) {
-				var ancestor = new Ancestor(ancestorPairsList, ancestorIdKey);
-				function ModelList(pairsList, idKey) {
-					initialize.call(this, (ancestorPairsList || false).constructor === Array ? (pairsList || false).constructor === Array ? mixList(ancestorPairsList, pairsList) : ancestorPairsList : pairsList, idKey || ancestorIdKey);
-				}
-				ModelList.prototype = ancestor;
-				ModelList.prototype.ancestor = function () {
-					return ancestor;
-				};
-				return mix(Ancestor, ModelList);
-			}(this, pairsList, idKey));
 		}
 
 		function ModelList(pairsList, idKey) {
@@ -983,13 +968,127 @@ var Pattern = (function () {
 		ModelList.prototype.indexOf = function (model) {
 			return modelListManager.indexOf(this.lid(), model);
 		};
-		ModelList.descendant = descendant;
+		ModelList.prototype.descendant = (function () {
+			var hasKey = Object.prototype.hasOwnProperty;
+			function hasValue(array, value) {
+				var i = 0, j = array.length;
+				do {
+					if (array[i] === value) return true ;
+				} while (++i < j);
+				return false;
+			}
+			function mix(alpha, omega) {
+				var key;
+				for (key in alpha) {
+					if (hasKey.call(alpha, key) === true) {
+						if (hasKey.call(omega, key) === false) {
+							omega[key] = alpha[key];
+						}
+					}
+				}
+				return omega;
+			}
+			function mixList(alpha, omega) {
+				var n = alpha.length, value;
+				while (n--) {
+					value = alpha[n];
+					if (hasValue(omega, value) === false) {
+						omega.unshift(value);
+					}
+				}
+				return omega;
+			}
+			return function (pairsList, idKey) {
+				return (function (ancestor, ancestorPairsList, ancestorIdKey) {
+					function ModelList(pairsList, idKey) {
+						this.ancestor = function () {
+							return ancestor;
+						};
+						initialize.call(this, (ancestorPairsList || false).constructor === Array ? (pairsList || false).constructor === Array ? mixList(ancestorPairsList, pairsList) : ancestorPairsList : pairsList, idKey || ancestorIdKey);
+						modelListManager.mix(ancestor.lid(), this.lid());
+					}
+					ModelList.prototype = ancestor;
+					return mix(ancestor.constructor, ModelList);
+				}(this, pairsList, idKey));
+			};
+		}());
+
+		ModelList.descendant = (function () {
+			var hasKey = Object.prototype.hasOwnProperty;
+			function hasValue(array, value) {
+				var i = 0, j = array.length;
+				do {
+					if (array[i] === value) return true ;
+				} while (++i < j);
+				return false;
+			}
+			function mix(alpha, omega) {
+				var key;
+				for (key in alpha) {
+					if (hasKey.call(alpha, key) === true) {
+						if (hasKey.call(omega, key) === false) {
+							omega[key] = alpha[key];
+						}
+					}
+				}
+				return omega;
+			}
+			function mixList(alpha, omega) {
+				var n = alpha.length, value;
+				while (n--) {
+					value = alpha[n];
+					if (hasValue(omega, value) === false) {
+						omega.unshift(value);
+					}
+				}
+				return omega;
+			}
+			return function (pairsList, idKey) {
+				return (function (ancestor, ancestorPairsList, ancestorIdKey) {
+					function ModelList(pairsList, idKey) {
+						this.ancestor = function () {
+							return ancestor;
+						};
+						initialize.call(this, (ancestorPairsList || false).constructor === Array ? (pairsList || false).constructor === Array ? mixList(ancestorPairsList, pairsList) : ancestorPairsList : pairsList, idKey || ancestorIdKey);
+					}
+					ModelList.prototype = ancestor;
+					return mix(ancestor.constructor, ModelList);
+				}(new this(pairsList, idKey), pairsList, idKey));
+			};
+		}());
 
 		return ModelList;
 
 	}());
 
 	View = (function () {
+
+		var descendant = (function () {
+			var hasKey = Object.prototype.hasOwnProperty;
+			function mix(alpha, omega) {
+				var key;
+				for (key in alpha) {
+					if (hasKey.call(alpha, key) === true) {
+						if (hasKey.call(omega, key) === false) {
+							omega[key] = alpha[key];
+						}
+					}
+				}
+				return omega;
+			}
+			return function (model) {
+				return (function (ancestor, ancestorModel) {
+					function View(model) {
+						this.ancestor = function () {
+							return ancestor;
+						};
+						initialize.call(this, model || ancestorModel);
+					}
+					View.prototype = ancestor;
+					return mix(ancestor.constructor, View);
+				}(this instanceof View ? this : new this(model), model));
+			};
+		}());
 
 		function initialize(model) {
 			var vid;
@@ -1002,31 +1101,6 @@ var Pattern = (function () {
 			viewManager.initialize(vid, model);
 		}
 
-		function descendant(model) {
-			function mix(alpha, omega) {
-				var key, has = Object.prototype.hasOwnProperty;
-				for (key in alpha) {
-					if (has.call(alpha, key)) {
-						if ((key in omega) === false) {
-							omega[key] = alpha[key];
-						}
-					}
-				}
-				return omega;
-			}
-			return (function (Ancestor, ancestorModel) {
-				var ancestor = new Ancestor(ancestorModel);
-				function View(model) {
-					initialize.call(this, model || ancestorModel);
-				}
-				View.prototype = ancestor;
-				View.prototype.ancestor = function () {
-					return ancestor;
-				};
-				return mix(Ancestor, View);
-			}(this, model));
-		}
-
 		function View(model) {
 			initialize.call(this, model);
 		}
@@ -1035,6 +1109,8 @@ var Pattern = (function () {
 
 		};
 		*/
+		View.prototype.descendant = descendant;
+
 		View.descendant = descendant;
 
 		return View;
@@ -1042,6 +1118,33 @@ var Pattern = (function () {
 	}());
 
 	ViewList = (function () {
+
+		var descendant = (function () {
+			var hasKey = Object.prototype.hasOwnProperty;
+			function mix(alpha, omega) {
+				var key;
+				for (key in alpha) {
+					if (hasKey.call(alpha, key) === true) {
+						if (hasKey.call(omega, key) === false) {
+							omega[key] = alpha[key];
+						}
+					}
+				}
+				return omega;
+			}
+			return function (modelList) {
+				return (function (ancestor, ancestorModelList) {
+					function ViewList(modelList) { //todo
+						this.ancestor = function () {
+							return ancestor;
+						};
+						initialize.call(this, modelList || ancestorModelList);
+					}
+					ViewList.prototype = ancestor;
+					return mix(ancestor.constructor, ViewList);
+				}(this instanceof ViewList ? this : new this(modelList), modelList));
+			};
+		}());
 
 		function initialize(modelList) {
 			var lid;
@@ -1052,52 +1155,6 @@ var Pattern = (function () {
 			}(lid = createLID(createUID())));
 			viewListManager.manage(lid, this);
 			viewListManager.initialize(lid, modelList);
-		}
-
-		function descendant(modelList) {
-			var hasOwnProperty = Object.prototype.hasOwnProperty;
-			function has(modelList, mid) {
-				var i = 0, j = modelList.length;
-				do {
-					if (modelList[i] === mid) return true ;
-				} while (++i < j);
-				return false;
-			}
-			function mixList(alpha, omega) {
-				var alphaList = modelListManager.modelListFor(alpha.lid()),
-					omegaList = modelListManager.modelListFor(omega.lid()),
-					n = alphaList.length, mid;
-				while (n--) { //reverse and unshift
-					mid = alphaList[n]; console.log(mid);
-					if (has(omegaList, mid) === false) {
-						omegaList.unshift(mid);
-					}
-				}
-				return omegaList;
-			}
-			function mix(alpha, omega) {
-				var key;
-				for (key in alpha) {
-					if (hasOwnProperty.call(alpha, key)) {
-						if ((key in omega) === false) {
-							omega[key] = alpha[key];
-						}
-					}
-				}
-				return omega;
-			}
-			return (function (Ancestor, ancestorModelList) {
-				var ancestor = new Ancestor(ancestorModelList);
-				console.log(ancestor);
-				function ViewList(modelList) {
-					initialize.call(this, (ancestorModelList instanceof ModelList) ? (modelList instanceof ModelList) ? mixList(ancestorModelList, modelList) : ancestorModelList : modelList);
-				}
-				ViewList.prototype = ancestor;
-				ViewList.prototype.ancestor = function () {
-					return ancestor;
-				};
-				return mix(Ancestor, ViewList);;
-			}(this, modelList));
 		}
 
 		function ViewList(modelList) {
@@ -1121,6 +1178,8 @@ var Pattern = (function () {
 		ViewList.prototype.indexOf = function (view) {
 			return viewListManager.indexOf(this.lid(), view);
 		};
+		ViewList.prototype.descendant = descendant;
+
 		ViewList.descendant = descendant;
 
 		return ViewList;
