@@ -49,14 +49,35 @@ var Pattern = (function () {
 
 	};
 
+	function Predicates() {
+		var predicates = {};
+		this.allPredicates = function () {
+			return predicates;
+		};
+	}
+	Predicates.prototype.predicatesFor = function (uid) {
+		var predicates = this.allPredicates();
+		return (predicates[uid] || (predicates[uid] = {}));
+	};
+	Predicates.prototype.get = function (uid, key) {
+		return (this.predicatesFor(uid))[key];
+	};
+	Predicates.prototype.set = function (uid, key, value) {
+		(this.predicatesFor(uid))[key] = value;
+	};
+
 	ModelManager = (function () {
 
 		function ModelManager() {
-			var changedAttributes = {},
-				currentAttributes = {},
+			var predicates = new Predicates(),
 				defaultAttributes = {},
+				changedAttributes = {},
+				currentAttributes = {},
 				validators = {},
 				idKeys = {};
+			this.predicates = function () {
+				return predicates;
+			};
 			this.allDefaultAttributes = function () {
 				return defaultAttributes;
 			};
@@ -75,6 +96,12 @@ var Pattern = (function () {
 		}
 		ModelManager.prototype.allModels = function () {
 			return modelStorage.allModels();
+		};
+		ModelManager.prototype.allPredicates = function () {
+			return this.predicates().allPredicates();
+		};
+		ModelManager.prototype.predicatesFor = function (mid) {
+			return this.predicates().predicatesFor(mid);
 		};
 		ModelManager.prototype.defaultValuesFor = function (mid) {
 			var defaultAttributes = this.allDefaultAttributes();
@@ -173,6 +200,15 @@ var Pattern = (function () {
 		};
 		ModelManager.prototype.manage = function (mid, model) {
 			(this.allModels())[mid] = model;
+		};
+		ModelManager.prototype.forget = function (mid) {
+			delete (this.allPredicates())[mid];
+			delete (this.allCurrentAttributes())[mid];
+			delete (this.allChangedAttributes())[mid];
+			delete (this.allDefaultAttributes())[mid];
+			delete (this.allValidators())[mid];
+			delete (this.allIdKeys())[mid];
+			delete (this.allModels())[mid];
 		};
 		ModelManager.prototype.getIDKey = function (mid) {
 			return (this.allIdKeys())[mid] || "id";
@@ -405,6 +441,11 @@ var Pattern = (function () {
 			}
 			if (changedKeys.length > 0) this.report("resetAll", mid, changedKeys);
 		};
+		ModelManager.prototype.ancestor = function (mid, model) {
+			var uid = (model) ? model.mid() : null;
+			return (uid) ? this.predicates().set(mid, "ancestor", uid) :
+			(uid = this.predicates().get(mid, "ancestor")) ? (this.allModels())[uid] : null;
+		};
 
 		eventManager = new EventManager();
 
@@ -428,9 +469,13 @@ var Pattern = (function () {
 	ModelListManager = (function () {
 
 		function ModelListManager() {
-			var attributes = {};
+			var predicates = new Predicates(),
+				attributes = {};
 			this.allAttributes = function () {
 				return attributes;
+			};
+			this.predicates = function () {
+				return predicates;
 			};
 		}
 		ModelListManager.prototype.allModels = function () {
@@ -439,8 +484,19 @@ var Pattern = (function () {
 		ModelListManager.prototype.allModelLists = function () {
 			return modelListStorage.allModelLists();
 		};
+		ModelListManager.prototype.allPredicates = function () {
+			return this.predicates().allPredicates();
+		};
+		ModelListManager.prototype.predicatesFor = function (lid) {
+			return this.predicates().predicatesFor(lid);
+		};
 		ModelListManager.prototype.manage = function (lid, modelList) {
 			(this.allModelLists())[lid] = modelList;
+		};
+		ModelListManager.prototype.forget = function (lid) {
+			delete (this.allPredicates())[lid];
+			delete (this.allAttributes())[lid];
+			delete (this.allModelLists())[lid];
 		};
 		ModelListManager.prototype.modelListFor = function (lid) {
 			var attributes = this.allAttributes();
@@ -598,6 +654,11 @@ var Pattern = (function () {
 			}
 			return -1;
 		};
+		ModelListManager.prototype.ancestor = function (mid, modelList) {
+			var uid = (modelList) ? modelList.lid() : null;
+			return (uid) ? this.predicates().set(mid, "ancestor", uid) :
+			(uid = this.predicates().get(mid, "ancestor")) ? (this.allModelLists())[uid] : null;
+		};
 		ModelListManager.prototype.initialize = function (lid, pairsList, idKey) {
 			var pairs,
 				model,
@@ -637,20 +698,51 @@ var Pattern = (function () {
 	ViewManager = (function () {
 
 		function ViewManager() {
-			var attributes = {};
+			var predicates = new Predicates(),
+				attributes = {};
 			this.allAttributes = function () {
 				return attributes;
+			};
+			this.predicates = function () {
+				return predicates;
 			};
 		}
 		ViewManager.prototype.allViews = function () {
 			return viewStorage.allViews();
 		};
+		ViewManager.prototype.allModels = function () {
+			return modelStorage.allModels();
+		};
+		ViewManager.prototype.allPredicates = function () {
+			return this.predicates().allPredicates();
+		};
+		ViewManager.prototype.predicatesFor = function (vid) {
+			return this.predicates().predicatesFor(vid);
+		};
 		ViewManager.prototype.manage = function (vid, view) {
 			(this.allViews())[vid] = view;
 		};
+		ViewManager.prototype.forget = function (vid) {
+			delete (this.allPredicates())[vid];
+			delete (this.allAttributes())[vid];
+			delete (this.allViews())[vid];
+		};
+		ViewManager.prototype.attributesFor = function (vid) {
+			return (this.allAttributes())[vid] || ((this.allAttributes())[vid] = {});
+		};
+		ViewManager.prototype.ancestor = function (vid, view) {
+			var uid = (view) ? view.vid() : null;
+			return (uid) ? this.predicates().set(vid, "ancestor", uid) :
+			(uid = this.predicates().get(vid, "ancestor")) ? (this.allViews())[uid] : null;
+		};
+		ViewManager.prototype.model = function (vid, model) {
+			var mid = (model) ? model.mid() : null;
+			return (mid) ? this.predicates().set(vid, "model", mid) :
+			(mid = this.predicates().get(vid, "model")) ? (this.allModels())[mid] : null;
+		};
 		ViewManager.prototype.initialize = function (vid, model) {
 			if (model instanceof Model) {
-
+				this.model(vid, model);
 			}
 		};
 
@@ -674,16 +766,34 @@ var Pattern = (function () {
 	ViewListManager = (function () {
 
 		function ViewListManager() {
-			var attributes = {};
+			var predicates = new Predicates(),
+				attributes = {};
 			this.allAttributes = function () {
 				return attributes;
+			};
+			this.predicates = function () {
+				return predicates;
 			};
 		}
 		ViewListManager.prototype.allViewLists = function () {
 			return viewListStorage.allViewLists();
 		};
+		ViewListManager.prototype.allModelLists = function () {
+			return modelListStorage.allModelLists();
+		};
+		ViewListManager.prototype.allPredicates = function () {
+			return this.predicates().allPredicates();
+		};
+		ViewListManager.prototype.predicatesFor = function (lid) {
+			return this.predicates().predicatesFor(lid);
+		};
 		ViewListManager.prototype.manage = function (lid, viewList) {
 			(this.allViewLists())[lid] = viewList;
+		};
+		ViewListManager.prototype.forget = function (lid) {
+			delete (this.allPredicates())[lid];
+			delete (this.allAttributes())[lid];
+			delete (this.allViewLists())[lid];
 		};
 		ViewListManager.prototype.viewListFor = function (lid) {
 			var attributes = this.allAttributes();
@@ -791,6 +901,16 @@ var Pattern = (function () {
 			}
 			return -1;
 		};
+		ViewListManager.prototype.ancestor = function (lid, viewList) {
+			var uid = (viewList) ? viewList.lid() : null;
+			return (uid) ? this.predicates().set(lid, "ancestor", uid) :
+			(uid = this.predicates().get(lid, "ancestor")) ? (this.allViewLists())[uid] : null;
+		};
+		ViewListManager.prototype.modelList = function (lid, modelList) {
+			var uid = (modelList) ? modelList.lid() : null;
+			return (uid) ? this.predicates().set(lid, "modelList", uid) :
+			(uid = this.predicates().get(lid, "modelList")) ? (this.allModelLists())[uid] : null;
+		};
 		ViewListManager.prototype.initialize = function (lid, modelList) {
 			var viewList,
 				allModels,
@@ -799,6 +919,7 @@ var Pattern = (function () {
 				view,
 				vid;
 			if (modelList instanceof ModelList) {
+				this.modelList(lid, modelList);
 				viewList = this.viewListFor(lid);
 				allModels = modelList.all();
 				for (i = 0, j = allModels.length; i < j; i = i + 1) {
@@ -809,11 +930,6 @@ var Pattern = (function () {
 				}
 			}
 		};
-		/*
-		ViewList.prototype.modelList = function () {
-
-		};
-		*/
 
 		return ViewListManager;
 
@@ -860,29 +976,25 @@ var Pattern = (function () {
 				}
 				return omega;
 			}
-			function initialize(ancestor, pairs, idKey) { //ancestor.constructor.call(this, pairs, key);
-				var mid;
-				this.mid = (function (mid) {
-					return function () {
-						return mid;
-					};
-				}(mid = createMID(createUID())));
-				this.ancestor = (function () {
-					return function () {
-						return ancestor;
-					};
-				}());
-				modelManager.manage(mid, this);
-				modelManager.initialize(mid, pairs, idKey);
+			function initialize(ancestor, pairs, idKey) {
+				ancestor.constructor.call(this, pairs, idKey);
+				modelManager.ancestor(this.mid(), ancestor);
 			}
 			return function (pairs, idKey) {
 
 				return (function (ancestor, ancestorPairs, ancestorIdKey) {
 
+					var prototype = new ancestor.constructor();
+
 					function Model(pairs, idKey) {
 						initialize.call(this, ancestor, inheritAll(ancestorPairs, pairs), idKey || ancestorIdKey);
 					}
-					Model.prototype = ancestor;
+					Model.prototype = prototype;
+					Model.prototype.ancestor = function () {
+						return modelManager.ancestor(this.mid());
+					};
+
+					modelManager.forget(prototype.mid());
 
 					return inherit(ancestor.constructor, Model);
 
@@ -1031,30 +1143,27 @@ var Pattern = (function () {
 				}
 				return omega;
 			}
-			function initialize(ancestor, pairsList, idKey) { //aid, pairsList, idKey
-				var aid = ancestor.lid(), lid;
-				this.lid = (function (lid) {
-					return function () {
-						return lid;
-					};
-				}(lid = createLID(createUID())));
-				this.ancestor = (function () {
-					return function () {
-						return ancestor;
-					};
-				}());
-				modelListManager.manage(lid, this);
-				modelListManager.inheritAll(aid, lid);
-				modelListManager.initialize(lid, pairsList, idKey);
+			function initialize(ancestor, pairsList, idKey) {
+				var lid;
+				ancestor.constructor.call(this, pairsList, idKey);
+				modelListManager.ancestor(lid = this.lid(), ancestor);
+				modelListManager.inheritAll(ancestor.lid(), lid);
 			}
 			return function (pairsList, idKey) {
 
 				return (function (ancestor, ancestorPairsList, ancestorIdKey) {
 
+					var prototype = new ancestor.constructor();
+
 					function ModelList(pairsList, idKey) {
 						initialize.call(this, ancestor, inheritAll(ancestorPairsList, pairsList), idKey || ancestorIdKey);
 					}
 					ModelList.prototype = ancestor;
+					ModelList.prototype.ancestor = function () {
+						return modelListManager.ancestor(this.lid());
+					};
+
+					modelListManager.forget(prototype.lid());
 
 					return inherit(ancestor.constructor, ModelList);
 
@@ -1096,32 +1205,25 @@ var Pattern = (function () {
 				}
 				return omega;
 			}
-			function initialize(ancestor, pairsList, idKey) { //aid, pairsList, idKey
-				var lid;
-				this.lid = (function (lid) {
-					return function () {
-						return lid;
-					};
-				}(lid = createLID(createUID())));
-				this.ancestor = (function () {
-					return function () {
-						return ancestor;
-					};
-				}());
-				modelListManager.manage(lid, this);
-				modelListManager.initialize(lid, pairsList, idKey);
+			function initialize(ancestor, pairsList, idKey) {
+				ancestor.constructor.call(this, pairsList, idKey);
+				modelListManager.ancestor(this.lid(), ancestor);
 			}
 			return function (pairsList, idKey) {
 
 				return (function (ancestor, ancestorPairsList, ancestorIdKey) {
 
+					var prototype = new ancestor.constructor();
+
 					function ModelList(pairsList, idKey) {
 						initialize.call(this, ancestor, inheritAll(ancestorPairsList, pairsList), idKey || ancestorIdKey);
 					}
-					ModelList.prototype = ancestor; /*
+					ModelList.prototype = ancestor;
 					ModelList.prototype.ancestor = function () {
-						return viewManager.ancestor(this.vid());
-					}; */
+						return modelListManager.ancestor(this.lid());
+					};
+
+					modelListManager.forget(prototype.lid());
 
 					return inherit(ancestor.constructor, ModelList);
 
@@ -1149,32 +1251,25 @@ var Pattern = (function () {
 				}
 				return omega;
 			}
-			function initialize(ancestor, model) { //aid, model
-				var vid;
-				this.vid = (function (vid) {
-					return function () {
-						return vid;
-					};
-				}(vid = createVID(createUID())));
-				this.ancestor = (function () { //don't need to double bag this
-					return function () {
-						return ancestor; //viewManager.ancestor(vid, aid);
-					};
-				}());
-				viewManager.manage(vid, this);
-				viewManager.initialize(vid, model);
+			function initialize(ancestor, model) {
+				ancestor.constructor.call(this, model);
+				viewManager.ancestor(this.vid(), ancestor);
 			}
 			return function (model) {
 
 				return (function (ancestor, ancestorModel) {
 
+					var prototype = new ancestor.constructor();
+
 					function View(model) { //ancestor.constructor.call(this, model);
 						initialize.call(this, ancestor, model || ancestorModel);
 					}
-					View.prototype = ancestor; /*
+					View.prototype = prototype;
 					View.prototype.ancestor = function () {
 						return viewManager.ancestor(this.vid());
-					}; */
+					};
+
+					viewManager.forget(prototype.vid());
 
 					return inherit(ancestor.constructor, View);
 
@@ -1197,11 +1292,9 @@ var Pattern = (function () {
 		function View(model) {
 			initialize.call(this, model);
 		}
-		/*
 		View.prototype.model = function () {
-
+			return viewManager.model(this.vid());
 		};
-		*/
 		View.prototype.descendant = descendant;
 
 		View.descendant = descendant;
@@ -1226,28 +1319,24 @@ var Pattern = (function () {
 				return omega;
 			}
 			function initialize(ancestor, modelList) {
-				var lid;
-				this.lid = (function (lid) {
-					return function () {
-						return lid;
-					};
-				}(lid = createLID(createUID())));
-				this.ancestor = (function () {
-					return function () {
-						return ancestor;
-					};
-				}());
-				viewListManager.manage(lid, this);
-				viewListManager.initialize(lid, modelList);
+				ancestor.constructor.call(this, modelList);
+				viewListManager.ancestor(this.lid(), ancestor);
 			}
 			return function (modelList) {
 
 				return (function (ancestor, ancestorModelList) {
 
+					var prototype = new ancestor.constructor();
+
 					function ViewList(modelList) {
-						initialize.call(this, modelList || ancestorModelList);
+						initialize.call(this, ancestor, modelList || ancestorModelList);
 					}
-					ViewList.prototype = ancestor;
+					ViewList.prototype = prototype;
+					ViewList.prototype.ancestor = function () {
+						return viewListManager.ancestor(this.lid());
+					};
+
+					viewListManager.forget(prototype.lid());
 
 					return inherit(ancestor.constructor, ViewList);
 
@@ -1288,6 +1377,9 @@ var Pattern = (function () {
 		ViewList.prototype.indexOf = function (view) {
 			return viewListManager.indexOf(this.lid(), view);
 		};
+		ViewList.prototype.modelList = function () {
+			return viewListManager.modelList(this.lid());
+		};
 		ViewList.prototype.descendant = descendant;
 
 		ViewList.descendant = descendant;
@@ -1307,14 +1399,12 @@ var Pattern = (function () {
 	viewListManager = new ViewListManager();
 	viewListStorage = new ViewListStorage();
 
-	/*
 	window.pattern = {
 		modelStorage: modelStorage,
 		modelListStorage: modelListStorage,
 		viewStorage: viewStorage,
 		viewListStorage: viewListStorage
 	};
-	*/
 
 	return {
 
