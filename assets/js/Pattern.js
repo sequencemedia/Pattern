@@ -2,27 +2,20 @@ var Pattern = (function () {
 
 	"use strict";
 
-	var ModelManager,
+	var createUID,
+		eventManager,
 		modelManager,
-		ModelStorage,
 		modelStorage,
-		ModelListManager,
 		modelListManager,
-		ModelListStorage,
 		modelListStorage,
-		ViewManager,
 		viewManager,
-		ViewStorage,
 		viewStorage,
-		ViewListManager,
 		viewListManager,
-		ViewListStorage,
 		viewListStorage,
 		Model,
 		ModelList,
 		View,
-		ViewList,
-		createUID;
+		ViewList;
 
 	function createLID(uid) { return "lid-" + uid; }
 	function createMID(uid) { return "mid-" + uid; }
@@ -40,8 +33,6 @@ var Pattern = (function () {
 		};
 	}());
 
-	var eventManager;
-
 	function EventManager() { }
 	EventManager.prototype.publish = function (event, parameters) {
 
@@ -49,378 +40,327 @@ var Pattern = (function () {
 
 	};
 
-	function Predicates() {
-		var predicates = {};
+	function ModelManager() {
+		var predicates = {},
+			defaultAttributes = {},
+			changedAttributes = {},
+			currentAttributes = {},
+			validators = {},
+			idKeys = {};
 		this.allPredicates = function () {
 			return predicates;
 		};
+		this.allDefaultAttributes = function () {
+			return defaultAttributes;
+		};
+		this.allChangedAttributes = function () {
+			return changedAttributes;
+		};
+		this.allCurrentAttributes = function () {
+			return currentAttributes;
+		};
+		this.allValidators = function () {
+			return validators;
+		};
+		this.allIdKeys = function () {
+			return idKeys;
+		};
 	}
-	Predicates.prototype.predicatesFor = function (uid) {
+	ModelManager.prototype.allModels = function () {
+		return modelStorage.allModels();
+	};
+	ModelManager.prototype.predicatesFor = function (lid) {
 		var predicates = this.allPredicates();
-		return (predicates[uid] || (predicates[uid] = {}));
+		return (predicates[lid] || (predicates[lid] = {}));
 	};
-	Predicates.prototype.get = function (uid, key) {
-		return (this.predicatesFor(uid))[key];
+	ModelManager.prototype.getPredicateValue = function (mid, key) {
+		return (this.predicatesFor(mid))[key];
 	};
-	Predicates.prototype.set = function (uid, key, value) {
-		(this.predicatesFor(uid))[key] = value;
+	ModelManager.prototype.setPredicateValue = function (mid, key, value) {
+		(this.predicatesFor(mid))[key] = value;
 	};
-
-	ModelManager = (function () {
-
-		function ModelManager() {
-			var predicates = new Predicates(),
-				defaultAttributes = {},
-				changedAttributes = {},
-				currentAttributes = {},
-				validators = {},
-				idKeys = {};
-			this.predicates = function () {
-				return predicates;
-			};
-			this.allDefaultAttributes = function () {
-				return defaultAttributes;
-			};
-			this.allChangedAttributes = function () {
-				return changedAttributes;
-			};
-			this.allCurrentAttributes = function () {
-				return currentAttributes;
-			};
-			this.allValidators = function () {
-				return validators;
-			};
-			this.allIdKeys = function () {
-				return idKeys;
-			};
+	ModelManager.prototype.defaultValuesFor = function (mid) {
+		var defaultAttributes = this.allDefaultAttributes();
+		return (defaultAttributes[mid] || (defaultAttributes[mid] = {}));
+	};
+	ModelManager.prototype.changedValuesFor = function (mid) {
+		var changedAttributes = this.allChangedAttributes();
+		return (changedAttributes[mid] || (changedAttributes[mid] = {}));
+	};
+	ModelManager.prototype.currentValuesFor = function (mid) {
+		var currentAttributes = this.allCurrentAttributes();
+		return (currentAttributes[mid] || (currentAttributes[mid] = {}));
+	};
+	ModelManager.prototype.validatorsFor = function (mid) {
+		var validators = this.allValidators();
+		return (validators[mid] || (validators[mid] = {}));
+	};
+	ModelManager.prototype.getDefaultValue = function (mid, key) {
+		return (this.defaultValuesFor(mid))[key];
+	};
+	ModelManager.prototype.setDefaultValue = function (mid, key, value) {
+		(this.defaultValuesFor(mid))[key] = value;
+	};
+	ModelManager.prototype.isDefaultKey = function (mid, key) {
+		return (key in this.defaultValuesFor(mid));
+	};
+	ModelManager.prototype.isDefaultValue = function (mid, key, value) {
+		return (value === this.getDefaultValue(mid, key)) ? true : false;
+	};
+	ModelManager.prototype.getChangedValue = function (mid, key) {
+		return (this.changedValuesFor(mid))[key];
+	};
+	ModelManager.prototype.setChangedValue = function (mid, key, value) {
+		(this.changedValuesFor(mid))[key] = value;
+	};
+	ModelManager.prototype.isChangedKey = function (mid, key) {
+		return (key in this.changedValuesFor(mid));
+	};
+	ModelManager.prototype.isChangedValue = function (mid, key, value) {
+		return (value === this.getChangedValue(mid, key)) ? true : false;
+	};
+	ModelManager.prototype.getCurrentValue = function (mid, key) {
+		return (this.currentValuesFor(mid))[key];
+	};
+	ModelManager.prototype.setCurrentValue = function (mid, key, value) {
+		(this.currentValuesFor(mid))[key] = value;
+	};
+	ModelManager.prototype.isCurrentKey = function (mid, key) {
+		return (key in this.currentValuesFor(mid));
+	};
+	ModelManager.prototype.isCurrentValue = function (mid, key, value) {
+		return (value === this.getCurrentValue(mid, key)) ? true : false;
+	};
+	ModelManager.prototype.validate = function (mid, key, value) {
+		var validator = (this.validatorsFor(mid))[key];
+		return (validator || false).constructor === Function ? validator(key, value) : true;
+	};
+	ModelManager.prototype.report = function (eventType, mid, key) {
+		var KEY = key === "id" ? this.getIDKey(mid) : key,
+			current = this.getCurrentValue(mid, KEY),
+			changed = this.getChangedValue(mid, KEY);
+		eventManager.publish(eventType, {
+			current: current,
+			changed: changed,
+			model: (this.allModels())[mid]
+		});
+	};
+	ModelManager.prototype.reportAll = function (eventType, mid, keys) {
+		var KEY, key,
+			changedValues = this.changedValuesFor(mid),
+			currentValues = this.currentValuesFor(mid),
+			changed = {},
+			current = {};
+		while (key = keys.shift()) {
+			KEY = key === "id" ? this.getIDKey(mid) : key;
+			changed[key] = changedValues[KEY];
+			current[key] = currentValues[KEY];
 		}
-		ModelManager.prototype.allModels = function () {
-			return modelStorage.allModels();
-		};
-		ModelManager.prototype.allPredicates = function () {
-			return this.predicates().allPredicates();
-		};
-		ModelManager.prototype.predicatesFor = function (mid) {
-			return this.predicates().predicatesFor(mid);
-		};
-		ModelManager.prototype.defaultValuesFor = function (mid) {
-			var defaultAttributes = this.allDefaultAttributes();
-			return (defaultAttributes[mid] || (defaultAttributes[mid] = {}));
-		};
-		ModelManager.prototype.changedValuesFor = function (mid) {
-			var changedAttributes = this.allChangedAttributes();
-			return (changedAttributes[mid] || (changedAttributes[mid] = {}));
-		};
-		ModelManager.prototype.currentValuesFor = function (mid) {
-			var currentAttributes = this.allCurrentAttributes();
-			return (currentAttributes[mid] || (currentAttributes[mid] = {}));
-		};
-		ModelManager.prototype.validatorsFor = function (mid) {
-			var validators = this.allValidators();
-			return (validators[mid] || (validators[mid] = {}));
-		};
-		ModelManager.prototype.getDefaultValue = function (mid, key) {
-			return (this.defaultValuesFor(mid))[key];
-		};
-		ModelManager.prototype.setDefaultValue = function (mid, key, value) {
-			(this.defaultValuesFor(mid))[key] = value;
-		};
-		ModelManager.prototype.isDefaultKey = function (mid, key) {
-			return (key in this.defaultValuesFor(mid));
-		};
-		ModelManager.prototype.isDefaultValue = function (mid, key, value) {
-			return (value === this.getDefaultValue(mid, key)) ? true : false;
-		};
-		ModelManager.prototype.getChangedValue = function (mid, key) {
-			return (this.changedValuesFor(mid))[key];
-		};
-		ModelManager.prototype.setChangedValue = function (mid, key, value) {
-			(this.changedValuesFor(mid))[key] = value;
-		};
-		ModelManager.prototype.isChangedKey = function (mid, key) {
-			return (key in this.changedValuesFor(mid));
-		};
-		ModelManager.prototype.isChangedValue = function (mid, key, value) {
-			return (value === this.getChangedValue(mid, key)) ? true : false;
-		};
-		ModelManager.prototype.getCurrentValue = function (mid, key) {
-			return (this.currentValuesFor(mid))[key];
-		};
-		ModelManager.prototype.setCurrentValue = function (mid, key, value) {
-			(this.currentValuesFor(mid))[key] = value;
-		};
-		ModelManager.prototype.isCurrentKey = function (mid, key) {
-			return (key in this.currentValuesFor(mid));
-		};
-		ModelManager.prototype.isCurrentValue = function (mid, key, value) {
-			return (value === this.getCurrentValue(mid, key)) ? true : false;
-		};
-		ModelManager.prototype.validate = function (mid, key, value) {
-			var validator = (this.validatorsFor(mid))[key];
-			return (validator || false).constructor === Function ? validator(key, value) : true;
-		};
-		ModelManager.prototype.report = function (eventType, mid, key) {
-			var KEY = key === "id" ? this.getIDKey(mid) : key,
-				current = this.getCurrentValue(mid, KEY),
-				changed = this.getChangedValue(mid, KEY);
-			eventManager.publish(eventType, {
-				current: current,
-				changed: changed,
-				model: (this.allModels())[mid]
-			});
-		};
-		ModelManager.prototype.reportAll = function (eventType, mid, keys) {
-			var KEY, key,
-				changedValues = this.changedValuesFor(mid),
-				currentValues = this.currentValuesFor(mid),
-				changed = {},
-				current = {};
-			while (key = keys.shift()) {
+		eventManager.publish(eventType, {
+			current: current,
+			changed: changed,
+			model: (this.allModels())[mid]
+		});
+	};
+	ModelManager.prototype.manage = function (mid, model) {
+		(this.allModels())[mid] = model;
+	};
+	ModelManager.prototype.forget = function (mid) {
+		delete (this.allPredicates())[mid];
+		delete (this.allCurrentAttributes())[mid];
+		delete (this.allChangedAttributes())[mid];
+		delete (this.allDefaultAttributes())[mid];
+		delete (this.allValidators())[mid];
+		delete (this.allIdKeys())[mid];
+		delete (this.allModels())[mid];
+	};
+	ModelManager.prototype.getIDKey = function (mid) {
+		return (this.allIdKeys())[mid] || "id";
+	};
+	ModelManager.prototype.setIDKey = function (mid, key) {
+		if (typeof key === "string") (this.allIdKeys())[mid] = key;
+	};
+	ModelManager.prototype.get = function (mid, key) {
+		var KEY = key === "id" ? this.getIDKey(mid) : key;
+		return this.getCurrentValue(mid, KEY);
+	};
+	ModelManager.prototype.getEach = function (mid, keys) {
+		var pairs, i, j, key, KEY;
+		if ((keys || false).constructor === Array) {
+			pairs = {};
+			for (i = 0, j = keys.length; i < j; i = i + 1) {
+				key = keys[i];
 				KEY = key === "id" ? this.getIDKey(mid) : key;
-				changed[key] = changedValues[KEY];
-				current[key] = currentValues[KEY];
-			}
-			eventManager.publish(eventType, {
-				current: current,
-				changed: changed,
-				model: (this.allModels())[mid]
-			});
-		};
-		ModelManager.prototype.initialize = function (mid, pairs, idKey) {
-			var key, value, changedKeys = [];
-			for (key in pairs) {
-				value = pairs[key];
-				this.setDefaultValue(mid, key, value);
-				this.setChangedValue(mid, key, value);
-				this.setCurrentValue(mid, key, value);
-				changedKeys.push(key);
-			}
-			if (idKey !== this.getIDKey(mid)) this.setIDKey(mid, idKey);
-			this.reportAll("initialize", mid, changedKeys);
-		};
-		ModelManager.prototype.manage = function (mid, model) {
-			(this.allModels())[mid] = model;
-		};
-		ModelManager.prototype.forget = function (mid) {
-			delete (this.allPredicates())[mid];
-			delete (this.allCurrentAttributes())[mid];
-			delete (this.allChangedAttributes())[mid];
-			delete (this.allDefaultAttributes())[mid];
-			delete (this.allValidators())[mid];
-			delete (this.allIdKeys())[mid];
-			delete (this.allModels())[mid];
-		};
-		ModelManager.prototype.getIDKey = function (mid) {
-			return (this.allIdKeys())[mid] || "id";
-		};
-		ModelManager.prototype.setIDKey = function (mid, key) {
-			if (typeof key === "string") (this.allIdKeys())[mid] = key;
-		};
-		ModelManager.prototype.get = function (mid, key) {
-			var KEY = key === "id" ? this.getIDKey(mid) : key;
-			return this.getCurrentValue(mid, KEY);
-		};
-		ModelManager.prototype.getEach = function (mid, keys) {
-			var pairs, i, j, key, KEY;
-			if ((keys || false).constructor === Array) {
-				pairs = {};
-				for (i = 0, j = keys.length; i < j; i = i + 1) {
-					key = keys[i];
-					KEY = key === "id" ? this.getIDKey(mid) : key;
-					pairs[key] = this.getCurrentValue(mid, KEY);
-				}
-				return pairs;
-			}
-		};
-		ModelManager.prototype.getAll = function (mid) {
-			var currentValues = this.currentValuesFor(mid), key, KEY, pairs = {};
-			for (key in currentValues) {
-				KEY = key === "id" ? this.getIDKey(mid) : key;
-				pairs[key] = currentValues[KEY];
+				pairs[key] = this.getCurrentValue(mid, KEY);
 			}
 			return pairs;
-		};
-		ModelManager.prototype.set = function (mid, key, value) {
-			var KEY = key === "id" ? this.getIDKey(mid) : key;
-			if (!this.isCurrentValue(mid, KEY, value)) {
-				if (this.validate(mid, KEY, value)) {
-					this.setChangedValue(mid, KEY, this.getCurrentValue(mid, KEY));
-					this.setCurrentValue(mid, KEY, value);
-					this.report("change", mid, key);
-				}
+		}
+	};
+	ModelManager.prototype.getAll = function (mid) {
+		var currentValues = this.currentValuesFor(mid), key, KEY, pairs = {};
+		for (key in currentValues) {
+			KEY = key === "id" ? this.getIDKey(mid) : key;
+			pairs[key] = currentValues[KEY];
+		}
+		return pairs;
+	};
+	ModelManager.prototype.set = function (mid, key, value) {
+		var KEY = key === "id" ? this.getIDKey(mid) : key;
+		if (!this.isCurrentValue(mid, KEY, value)) {
+			if (this.validate(mid, KEY, value)) {
+				this.setChangedValue(mid, KEY, this.getCurrentValue(mid, KEY));
+				this.setCurrentValue(mid, KEY, value);
+				this.report("change", mid, key);
 			}
-		};
-		ModelManager.prototype.setEach = function (mid, pairs) {
-			var key, KEY, value, changedKeys;
-			if ((pairs || false).constructor === Object) {
-				changedKeys = [];
-				for (key in pairs) {
-					KEY = key === "id" ? this.getIDKey(mid) : key;
-					value = pairs[key]; //use external key!
-					if (!this.isCurrentValue(mid, KEY, value)) {
-						if (this.validate(mid, KEY, value)) {
-							this.setChangedValue(mid, KEY, this.getCurrentValue(mid, KEY));
-							this.setCurrentValue(mid, KEY, value);
-							this.report("change", mid, key);
-							changedKeys.push(key);
-						}
-					}
-				}
-				if (changedKeys.length > 0) this.reportAll("setEach", mid, changedKeys);
-			}
-		};
-		ModelManager.prototype.setAll = function (mid, value) {
-			var key, currentValues = this.currentValuesFor(mid), changedKeys = [];
-			for (key in currentValues) {
-				if (!this.isCurrentValue(mid, key, value)) {
-					if (this.validate(mid, key, value)) {
-						this.setChangedValue(mid, key, this.getCurrentValue(mid, key));
-						this.setCurrentValue(mid, key, value);
+		}
+	};
+	ModelManager.prototype.setEach = function (mid, pairs) {
+		var key, KEY, value, changedKeys;
+		if ((pairs || false).constructor === Object) {
+			changedKeys = [];
+			for (key in pairs) {
+				KEY = key === "id" ? this.getIDKey(mid) : key;
+				value = pairs[key]; //use external key!
+				if (!this.isCurrentValue(mid, KEY, value)) {
+					if (this.validate(mid, KEY, value)) {
+						this.setChangedValue(mid, KEY, this.getCurrentValue(mid, KEY));
+						this.setCurrentValue(mid, KEY, value);
 						this.report("change", mid, key);
 						changedKeys.push(key);
 					}
 				}
 			}
-			if (changedKeys.length > 0) this.reportAll("setAll", mid, changedKeys);
-		};
-		ModelManager.prototype.zed = function (mid, key) {
-			var KEY = key === "id" ? this.getIDKey(mid) : key,
-				value = this.getChangedValue(mid, KEY);
-			if (!this.isCurrentValue(mid, KEY, value)) {
-				this.setChangedValue(mid, KEY, this.getCurrentValue(mid, KEY));
-				this.setCurrentValue(mid, KEY, value);
-				this.report("change", mid, key);
-			}
-		};
-		ModelManager.prototype.zedEach = function (mid, keys) {
-			var changedValues, changedKeys, i, j, key, KEY, value;
-			if ((keys || false).constructor === Array) {
-				changedValues = this.changedValuesFor(mid);
-				changedKeys = [];
-				for (i = 0, j = keys.length; i < j; i = i + 1) {
-					key = keys[i];
-					KEY = key === "id" ? this.getIDKey(mid) : key;
-					if (KEY in changedValues) { //can't zed unchanged keys
-						value = changedValues[KEY];
-						if (!this.isCurrentValue(mid, KEY, value)) {
-							this.setChangedValue(mid, KEY, this.getCurrentValue(mid, KEY));
-							this.setCurrentValue(mid, KEY, value);
-							this.report("change", mid, key);
-							changedKeys.push(key);
-						}
-					}
-				}
-				if (changedKeys.length > 0) this.reportAll("zedEach", mid, changedKeys);
-			}
-		};
-		ModelManager.prototype.zedAll = function (mid) {
-			var key, changedValues = this.changedValuesFor(mid), value, changedKeys = [];
-			for (key in changedValues) {
-				value = changedValues[key]; //implicitly is changed
-				if (!this.isCurrentValue(mid, key, value)) {
+			if (changedKeys.length > 0) this.reportAll("setEach", mid, changedKeys);
+		}
+	};
+	ModelManager.prototype.setAll = function (mid, value) {
+		var key, currentValues = this.currentValuesFor(mid), changedKeys = [];
+		for (key in currentValues) {
+			if (!this.isCurrentValue(mid, key, value)) {
+				if (this.validate(mid, key, value)) {
 					this.setChangedValue(mid, key, this.getCurrentValue(mid, key));
 					this.setCurrentValue(mid, key, value);
 					this.report("change", mid, key);
 					changedKeys.push(key);
 				}
 			}
-			if (changedKeys.length > 0) this.reportAll("zedAll", mid, changedKeys);
-		};
-		ModelManager.prototype.unset = function (mid, key) {
-			var KEY = key === "id" ? this.getIDKey(mid) : key,
-				currentValues = this.currentValuesFor(mid), value;
-			if (KEY in currentValues) {
-				value = currentValues[KEY];
-				if (!this.isChangedValue(mid, KEY, value)) {
-					this.setChangedValue(mid, KEY, value);
-				}
-				delete currentValues[KEY];
-				this.report("change", mid, key);
-			}
-		};
-		ModelManager.prototype.unsetEach = function (mid, keys) {
-			var currentValues, changedKeys, i, j, key, KEY, value;
-			if ((keys || false).constructor === Array) {
-				currentValues = this.currentValuesFor(mid);
-				changedKeys = [];
-				for (i = 0, j = keys.length; i < j; i = i + 1) {
-					key = keys[i];
-					KEY = key === "id" ? this.getIDKey(mid) : key;
-					if (KEY in currentValues) { //can't zed unknown keys
-						value = currentValues[KEY];
-						if (!this.isChangedValue(mid, KEY, value)) {
-							this.setChangedValue(mid, KEY, value);
-						}
-						delete currentValues[KEY];
+		}
+		if (changedKeys.length > 0) this.reportAll("setAll", mid, changedKeys);
+	};
+	ModelManager.prototype.zed = function (mid, key) {
+		var KEY = key === "id" ? this.getIDKey(mid) : key,
+			value = this.getChangedValue(mid, KEY);
+		if (!this.isCurrentValue(mid, KEY, value)) {
+			this.setChangedValue(mid, KEY, this.getCurrentValue(mid, KEY));
+			this.setCurrentValue(mid, KEY, value);
+			this.report("change", mid, key);
+		}
+	};
+	ModelManager.prototype.zedEach = function (mid, keys) {
+		var changedValues, changedKeys, i, j, key, KEY, value;
+		if ((keys || false).constructor === Array) {
+			changedValues = this.changedValuesFor(mid);
+			changedKeys = [];
+			for (i = 0, j = keys.length; i < j; i = i + 1) {
+				key = keys[i];
+				KEY = key === "id" ? this.getIDKey(mid) : key;
+				if (KEY in changedValues) { //can't zed unchanged keys
+					value = changedValues[KEY];
+					if (!this.isCurrentValue(mid, KEY, value)) {
+						this.setChangedValue(mid, KEY, this.getCurrentValue(mid, KEY));
+						this.setCurrentValue(mid, KEY, value);
 						this.report("change", mid, key);
 						changedKeys.push(key);
 					}
 				}
-				if (changedKeys.length > 0) this.report("unsetEach", mid, changedKeys);
 			}
-		};
-		ModelManager.prototype.unsetAll = function (mid) {
-			var key, currentValues = this.currentValuesFor(mid), value, /* KEY = this.getIDKey(mid), */ changedKeys = [];
-			for (key in currentValues) {
-				value = currentValues[key];
-				if (!this.isChangedValue(mid, key, value)) {
-					this.setChangedValue(mid, key, value);
-				}
-				delete currentValues[key];
+			if (changedKeys.length > 0) this.reportAll("zedEach", mid, changedKeys);
+		}
+	};
+	ModelManager.prototype.zedAll = function (mid) {
+		var key, changedValues = this.changedValuesFor(mid), value, changedKeys = [];
+		for (key in changedValues) {
+			value = changedValues[key]; //implicitly is changed
+			if (!this.isCurrentValue(mid, key, value)) {
+				this.setChangedValue(mid, key, this.getCurrentValue(mid, key));
+				this.setCurrentValue(mid, key, value);
 				this.report("change", mid, key);
 				changedKeys.push(key);
 			}
-			if (changedKeys.length > 0) this.report("unsetAll", mid, changedKeys);
-		};
-		ModelManager.prototype.reset = function (mid, key) {
-			var KEY = key === "id" ? this.getIDKey(mid) : key,
-				currentValues = this.currentValuesFor(mid), value;
+		}
+		if (changedKeys.length > 0) this.reportAll("zedAll", mid, changedKeys);
+	};
+	ModelManager.prototype.unset = function (mid, key) {
+		var KEY = key === "id" ? this.getIDKey(mid) : key,
+			currentValues = this.currentValuesFor(mid), value;
+		if (KEY in currentValues) {
 			value = currentValues[KEY];
-			if (!this.isDefaultKey(mid, KEY)) { //unset
-				if (!this.isChangedValue(mid, KEY, value)) {
-					this.setChangedValue(mid, KEY, value);
-				}
-				delete currentValues[KEY];
-				this.report("change", mid, key);
-			} else {
-				if (!this.isDefaultValue(mid, KEY, value)) { //reset
-					this.setChangedValue(mid, KEY, value);
-					this.setCurrentValue(mid, KEY, this.getDefaultValue(mid, KEY));
-					this.report("change", mid, key);
-				}
+			if (!this.isChangedValue(mid, KEY, value)) {
+				this.setChangedValue(mid, KEY, value);
 			}
-		};
-		ModelManager.prototype.resetEach = function (mid, keys) {
-			var currentValues, changedKeys, i, j, key, KEY, value;
-			if ((keys || false).constructor === Array) {
-				currentValues = this.currentValuesFor(mid);
-				changedKeys = [];
-				for (i = 0, j = keys.length; i < j; i = i + 1) {
-					key = keys[i];
-					KEY = key === "id" ? this.getIDKey(mid) : key;
+			delete currentValues[KEY];
+			this.report("change", mid, key);
+		}
+	};
+	ModelManager.prototype.unsetEach = function (mid, keys) {
+		var currentValues, changedKeys, i, j, key, KEY, value;
+		if ((keys || false).constructor === Array) {
+			currentValues = this.currentValuesFor(mid);
+			changedKeys = [];
+			for (i = 0, j = keys.length; i < j; i = i + 1) {
+				key = keys[i];
+				KEY = key === "id" ? this.getIDKey(mid) : key;
+				if (KEY in currentValues) { //can't zed unknown keys
 					value = currentValues[KEY];
-					if (!this.isDefaultKey(mid, KEY)) { //unset
-						if (!this.isChangedValue(mid, KEY, value)) {
-							this.setChangedValue(mid, KEY, value);
-						}
-						delete currentValues[KEY];
-						this.report("change", mid, key);
-						changedKeys.push(key);
-					} else {
-						if (!this.isDefaultValue(mid, KEY, value)) { //reset
-							this.setChangedValue(mid, KEY, value);
-							this.setCurrentValue(mid, KEY, this.getDefaultValue(mid, KEY));
-							this.report("change", mid, key);
-							changedKeys.push(key);
-						}
+					if (!this.isChangedValue(mid, KEY, value)) {
+						this.setChangedValue(mid, KEY, value);
 					}
+					delete currentValues[KEY];
+					this.report("change", mid, key);
+					changedKeys.push(key);
 				}
-				if (changedKeys.length > 0) this.report("resetEach", mid, changedKeys);
 			}
-		};
-		ModelManager.prototype.resetAll = function (mid) {
-			var currentValues = this.currentValuesFor(mid), key, value, KEY, changedKeys = [];
-			for (key in currentValues) {
+			if (changedKeys.length > 0) this.report("unsetEach", mid, changedKeys);
+		}
+	};
+	ModelManager.prototype.unsetAll = function (mid) {
+		var key, currentValues = this.currentValuesFor(mid), value, /* KEY = this.getIDKey(mid), */ changedKeys = [];
+		for (key in currentValues) {
+			value = currentValues[key];
+			if (!this.isChangedValue(mid, key, value)) {
+				this.setChangedValue(mid, key, value);
+			}
+			delete currentValues[key];
+			this.report("change", mid, key);
+			changedKeys.push(key);
+		}
+		if (changedKeys.length > 0) this.report("unsetAll", mid, changedKeys);
+	};
+	ModelManager.prototype.reset = function (mid, key) {
+		var KEY = key === "id" ? this.getIDKey(mid) : key,
+			currentValues = this.currentValuesFor(mid), value;
+		value = currentValues[KEY];
+		if (!this.isDefaultKey(mid, KEY)) { //unset
+			if (!this.isChangedValue(mid, KEY, value)) {
+				this.setChangedValue(mid, KEY, value);
+			}
+			delete currentValues[KEY];
+			this.report("change", mid, key);
+		} else {
+			if (!this.isDefaultValue(mid, KEY, value)) { //reset
+				this.setChangedValue(mid, KEY, value);
+				this.setCurrentValue(mid, KEY, this.getDefaultValue(mid, KEY));
+				this.report("change", mid, key);
+			}
+		}
+	};
+	ModelManager.prototype.resetEach = function (mid, keys) {
+		var currentValues, changedKeys, i, j, key, KEY, value;
+		if ((keys || false).constructor === Array) {
+			currentValues = this.currentValuesFor(mid);
+			changedKeys = [];
+			for (i = 0, j = keys.length; i < j; i = i + 1) {
+				key = keys[i];
 				KEY = key === "id" ? this.getIDKey(mid) : key;
 				value = currentValues[KEY];
 				if (!this.isDefaultKey(mid, KEY)) { //unset
@@ -439,634 +379,633 @@ var Pattern = (function () {
 					}
 				}
 			}
-			if (changedKeys.length > 0) this.report("resetAll", mid, changedKeys);
-		};
-		ModelManager.prototype.ancestor = function (mid, model) {
-			var uid = (model) ? model.mid() : null;
-			return (uid) ? this.predicates().set(mid, "ancestor", uid) :
-			(uid = this.predicates().get(mid, "ancestor")) ? (this.allModels())[uid] : null;
-		};
-
-		eventManager = new EventManager();
-
-		return ModelManager;
-
-	}());
-
-	ModelStorage = (function () {
-
-		function ModelStorage() {
-			var models = {};
-			this.allModels = function () {
-				return models;
-			};
+			if (changedKeys.length > 0) this.report("resetEach", mid, changedKeys);
 		}
-
-		return ModelStorage;
-
-	}());
-
-	ModelListManager = (function () {
-
-		function ModelListManager() {
-			var predicates = new Predicates(),
-				attributes = {};
-			this.allAttributes = function () {
-				return attributes;
-			};
-			this.predicates = function () {
-				return predicates;
-			};
-		}
-		ModelListManager.prototype.allModels = function () {
-			return modelStorage.allModels();
-		};
-		ModelListManager.prototype.allModelLists = function () {
-			return modelListStorage.allModelLists();
-		};
-		ModelListManager.prototype.allPredicates = function () {
-			return this.predicates().allPredicates();
-		};
-		ModelListManager.prototype.predicatesFor = function (lid) {
-			return this.predicates().predicatesFor(lid);
-		};
-		ModelListManager.prototype.manage = function (lid, modelList) {
-			(this.allModelLists())[lid] = modelList;
-		};
-		ModelListManager.prototype.forget = function (lid) {
-			delete (this.allPredicates())[lid];
-			delete (this.allAttributes())[lid];
-			delete (this.allModelLists())[lid];
-		};
-		ModelListManager.prototype.modelListFor = function (lid) {
-			var attributes = this.allAttributes();
-			return (attributes[lid] || (attributes[lid] = []));
-		};
-		ModelListManager.prototype.get = function (lid, index) {
-			var modelList,
-				i, j,
-				upperBound,
-				lowerBound,
-				mid;
-			if (typeof index === "number") {
-				modelList = this.modelListFor(lid);
-				i = 0;
-				j = modelList.length;
-				if (i < j) {
-					upperBound = j - 1;
-					lowerBound = 0;
-					if (!(index > upperBound || index < lowerBound)) {
-						mid = modelList[index];
-						return (this.allModels())[mid];
-					}
+	};
+	ModelManager.prototype.resetAll = function (mid) {
+		var currentValues = this.currentValuesFor(mid), key, value, KEY, changedKeys = [];
+		for (key in currentValues) {
+			KEY = key === "id" ? this.getIDKey(mid) : key;
+			value = currentValues[KEY];
+			if (!this.isDefaultKey(mid, KEY)) { //unset
+				if (!this.isChangedValue(mid, KEY, value)) {
+					this.setChangedValue(mid, KEY, value);
+				}
+				delete currentValues[KEY];
+				this.report("change", mid, key);
+				changedKeys.push(key);
+			} else {
+				if (!this.isDefaultValue(mid, KEY, value)) { //reset
+					this.setChangedValue(mid, KEY, value);
+					this.setCurrentValue(mid, KEY, this.getDefaultValue(mid, KEY));
+					this.report("change", mid, key);
+					changedKeys.push(key);
 				}
 			}
-			return null;
+		}
+		if (changedKeys.length > 0) this.report("resetAll", mid, changedKeys);
+	};
+	ModelManager.prototype.ancestor = function (mid, model) {
+		var uid = (model) ? model.mid() : null;
+		return (uid) ? this.setPredicateValue(mid, "ancestor", uid) :
+		(uid = this.getPredicateValue(mid, "ancestor")) ? (this.allModels())[uid] : null;
+	};
+	ModelManager.prototype.initialize = function (mid, pairs, idKey) {
+		var key, value;
+		for (key in pairs) {
+			value = pairs[key];
+			this.setDefaultValue(mid, key, value);
+			this.setChangedValue(mid, key, value);
+			this.setCurrentValue(mid, key, value);
+		}
+		if (idKey !== this.getIDKey(mid)) this.setIDKey(mid, idKey);
+	};
+
+	function ModelStorage() {
+		var models = {};
+		this.allModels = function () {
+			return models;
 		};
-		ModelListManager.prototype.set = function (lid, index, model) {
-			var modelList,
-				i, j,
-				upperBound,
-				lowerBound,
-				mid;
-			if (typeof index === "number" && model instanceof Model) {
-				modelList = this.modelListFor(lid);
-				i = 0;
-				j = modelList.length;
-				mid = model.mid();
-				if (i === j) {
-					modelList.push(mid);
-				} else {
-					upperBound = j - 1; //no need to max() because j > 0
-					lowerBound = 0;
-					index = index > upperBound ? j : index < lowerBound ? lowerBound : index ;
-					do {
-						if (modelList[i] === mid) {
-							if (i === index) return ;
-							modelList.splice(i, 1);
-							break;
-						}
-					} while (++i < j);
-					modelList.splice(index, 0, mid);
+	}
+
+	function ModelListManager() {
+		var predicates = {},
+			attributes = {};
+		this.allPredicates = function () {
+			return predicates;
+		};
+		this.allAttributes = function () {
+			return attributes;
+		};
+	}
+	ModelListManager.prototype.allModels = function () {
+		return modelStorage.allModels();
+	};
+	ModelListManager.prototype.allModelLists = function () {
+		return modelListStorage.allModelLists();
+	};
+	ModelListManager.prototype.predicatesFor = function (lid) {
+		var predicates = this.allPredicates();
+		return (predicates[lid] || (predicates[lid] = {}));
+	};
+	ModelListManager.prototype.getPredicateValue = function (lid, key) {
+		return (this.predicatesFor(lid))[key];
+	};
+	ModelListManager.prototype.setPredicateValue = function (lid, key, value) {
+		(this.predicatesFor(lid))[key] = value;
+	};
+	ModelListManager.prototype.modelListFor = function (lid) {
+		var attributes = this.allAttributes();
+		return (attributes[lid] || (attributes[lid] = []));
+	};
+	ModelListManager.prototype.manage = function (lid, modelList) {
+		(this.allModelLists())[lid] = modelList;
+	};
+	ModelListManager.prototype.forget = function (lid) {
+		delete (this.allPredicates())[lid];
+		delete (this.allAttributes())[lid];
+		delete (this.allModelLists())[lid];
+	};
+	ModelListManager.prototype.get = function (lid, index) {
+		var modelList,
+			i, j,
+			upperBound,
+			lowerBound,
+			mid;
+		if (typeof index === "number") {
+			modelList = this.modelListFor(lid);
+			i = 0;
+			j = modelList.length;
+			if (i < j) {
+				upperBound = j - 1;
+				lowerBound = 0;
+				if (!(index > upperBound || index < lowerBound)) {
+					mid = modelList[index];
+					return (this.allModels())[mid];
 				}
 			}
-		};
-		ModelListManager.prototype.add = function (lid, model) {
-			var modelList,
-				i, j,
-				mid;
-			if (model instanceof Model) {
-				modelList = this.modelListFor(lid);
-				i = 0;
-				j = modelList.length;
-				mid = model.mid();
-				if (i < j) {
-					do {
-						if (modelList[i] === mid) return ;
-					} while (++i < j);
-				}
+		}
+		return null;
+	};
+	ModelListManager.prototype.set = function (lid, index, model) {
+		var modelList,
+			i, j,
+			upperBound,
+			lowerBound,
+			mid;
+		if (typeof index === "number" && model instanceof Model) {
+			modelList = this.modelListFor(lid);
+			i = 0;
+			j = modelList.length;
+			mid = model.mid();
+			if (i === j) {
 				modelList.push(mid);
+			} else {
+				upperBound = j - 1; //no need to max() because j > 0
+				lowerBound = 0;
+				index = index > upperBound ? j : index < lowerBound ? lowerBound : index ;
+				do {
+					if (modelList[i] === mid) {
+						if (i === index) return ;
+						modelList.splice(i, 1);
+						break;
+					}
+				} while (++i < j);
+				modelList.splice(index, 0, mid);
 			}
-		};
-		ModelListManager.prototype.addEach = function (lid, array) {
-			var i, j,
-				modelList,
-				model,
-				mid,
-				n, m;
-			if ((array || false).constructor === Array) {
-				i = 0;
-				j = array.length;
-				if (i < j) {
-					modelList = this.modelListFor(lid);
-					do {
-						model = array[i];
-						if (model instanceof Model) {
-							n = 0;
-							m = modelList.length;
-							mid = model.mid();
+		}
+	};
+	ModelListManager.prototype.add = function (lid, model) {
+		var modelList,
+			i, j,
+			mid;
+		if (model instanceof Model) {
+			modelList = this.modelListFor(lid);
+			i = 0;
+			j = modelList.length;
+			mid = model.mid();
+			if (i < j) {
+				do {
+					if (modelList[i] === mid) return ;
+				} while (++i < j);
+			}
+			modelList.push(mid);
+		}
+	};
+	ModelListManager.prototype.addEach = function (lid, array) {
+		var i, j,
+			modelList,
+			model,
+			mid,
+			n, m;
+		if ((array || false).constructor === Array) {
+			i = 0;
+			j = array.length;
+			if (i < j) {
+				modelList = this.modelListFor(lid);
+				do {
+					model = array[i];
+					if (model instanceof Model) {
+						n = 0;
+						m = modelList.length;
+						mid = model.mid();
+						if (n === m) {
+							modelList.push(mid);
+						} else {
+							do {
+								if (modelList[n] === mid) {
+									break;
+								}
+							} while (++n < m);
 							if (n === m) {
 								modelList.push(mid);
-							} else {
-								do {
-									if (modelList[n] === mid) {
-										break;
-									}
-								} while (++n < m);
-								if (n === m) {
-									modelList.push(mid);
-								}
 							}
 						}
-					} while (++i < j);
-				}
-			}
-		};
-		ModelListManager.prototype.remove = function (lid, model) {
-			var modelList,
-				i, j,
-				mid;
-			if (model instanceof Model) {
-				modelList = this.modelListFor(lid);
-				i = 0;
-				j = modelList.length;
-				if (i < j) {
-					mid = model.mid();
-					do {
-						if (modelList[i] === mid) {
-							modelList.splice(i, 1);
-							break;
-						}
-					} while (++i < j);
-				}
-			}
-		};
-		ModelListManager.prototype.removeEach = function (lid, array) {
-			var i, j,
-				modelList,
-				model,
-				mid,
-				n, m;
-			if ((array || false).constructor === Array) {
-				i = 0;
-				j = array.length;
-				if (i < j) {
-					modelList = this.modelListFor(lid);
-					do {
-						model = array[i];
-						if (model instanceof Model) {
-							n = 0;
-							m = modelList.length;
-							if (n < m) {
-								mid = model.mid();
-								do {
-									if (modelList[n] === mid) {
-										modelList.splice(n, 1);
-										break;
-									}
-								} while (++n < m);
-							}
-						}
-					} while (++i < j);
-				}
-			}
-		};
-		ModelListManager.prototype.all = function (lid) {
-			var modelList = this.modelListFor(lid),
-				i = 0, j = modelList.length, all = [],
-				allModels,
-				mid,
-				model;
-			if (i < j) {
-				allModels = this.allModels();
-				do {
-					mid = modelList[i];
-					model = allModels[mid];
-					all.push(model);
-				} while (++i < j);
-			}
-			return all;
-		};
-		ModelListManager.prototype.inheritAll = (function () {
-			function hasValue(array, value) {
-				var i = 0, j = array.length;
-				do {
-					if (array[i] === value) return true ;
-				} while (++i < j);
-				return false;
-			}
-			return function (alpha, omega) { //lid, lid
-				var alphaList = this.modelListFor(alpha),
-					omegaList = this.modelListFor(omega),
-					n = alphaList.length, mid;
-				while (n--) { //reverse and unshift
-					mid = alphaList[n];
-					if (hasValue(omegaList, mid) === false) {
-						omegaList.unshift(mid);
 					}
-				}
-			};
-		}());
-		ModelListManager.prototype.indexOf = function (lid, model) {
-			var modelList = this.modelListFor(lid),
-				i = 0, j = modelList.length,
-				mid;
+				} while (++i < j);
+			}
+		}
+	};
+	ModelListManager.prototype.remove = function (lid, model) {
+		var modelList,
+			i, j,
+			mid;
+		if (model instanceof Model) {
+			modelList = this.modelListFor(lid);
+			i = 0;
+			j = modelList.length;
 			if (i < j) {
 				mid = model.mid();
 				do {
-					if (modelList[i] === mid) return i;
+					if (modelList[i] === mid) {
+						modelList.splice(i, 1);
+						break;
+					}
 				} while (++i < j);
 			}
-			return -1;
-		};
-		ModelListManager.prototype.ancestor = function (mid, modelList) {
-			var uid = (modelList) ? modelList.lid() : null;
-			return (uid) ? this.predicates().set(mid, "ancestor", uid) :
-			(uid = this.predicates().get(mid, "ancestor")) ? (this.allModelLists())[uid] : null;
-		};
-		ModelListManager.prototype.initialize = function (lid, pairsList, idKey) {
-			var pairs,
-				model,
-				mid,
-				modelList,
-				allModels,
-				i, j;
-			if ((pairsList || false).constructor === Array) {
+		}
+	};
+	ModelListManager.prototype.removeEach = function (lid, array) {
+		var i, j,
+			modelList,
+			model,
+			mid,
+			n, m;
+		if ((array || false).constructor === Array) {
+			i = 0;
+			j = array.length;
+			if (i < j) {
 				modelList = this.modelListFor(lid);
-				allModels = this.allModels();
-				for (i = 0, j = pairsList.length; i < j; i = i + 1) {
-					pairs = pairsList[i];
-					model = new Model(pairs, idKey);
-					mid = model.mid();
-					modelList.push(mid);
-				}
-			}
-		};
-
-		return ModelListManager;
-
-	}());
-
-	ModelListStorage = (function () {
-
-		function ModelListStorage() {
-			var modelLists = {};
-			this.allModelLists = function () {
-				return modelLists;
-			};
-		}
-
-		return ModelListStorage;
-
-	}());
-
-	ViewManager = (function () {
-
-		function ViewManager() {
-			var predicates = new Predicates(),
-				attributes = {};
-			this.allAttributes = function () {
-				return attributes;
-			};
-			this.predicates = function () {
-				return predicates;
-			};
-		}
-		ViewManager.prototype.allViews = function () {
-			return viewStorage.allViews();
-		};
-		ViewManager.prototype.allModels = function () {
-			return modelStorage.allModels();
-		};
-		ViewManager.prototype.allPredicates = function () {
-			return this.predicates().allPredicates();
-		};
-		ViewManager.prototype.predicatesFor = function (vid) {
-			return this.predicates().predicatesFor(vid);
-		};
-		ViewManager.prototype.manage = function (vid, view) {
-			(this.allViews())[vid] = view;
-		};
-		ViewManager.prototype.forget = function (vid) {
-			delete (this.allPredicates())[vid];
-			delete (this.allAttributes())[vid];
-			delete (this.allViews())[vid];
-		};
-		ViewManager.prototype.attributesFor = function (vid) {
-			return (this.allAttributes())[vid] || ((this.allAttributes())[vid] = {});
-		};
-		ViewManager.prototype.ancestor = function (vid, view) {
-			var uid = (view) ? view.vid() : null;
-			return (uid) ? this.predicates().set(vid, "ancestor", uid) :
-			(uid = this.predicates().get(vid, "ancestor")) ? (this.allViews())[uid] : null;
-		};
-		ViewManager.prototype.model = function (vid, model) {
-			var mid = (model) ? model.mid() : null;
-			return (mid) ? this.predicates().set(vid, "model", mid) :
-			(mid = this.predicates().get(vid, "model")) ? (this.allModels())[mid] : null;
-		};
-		ViewManager.prototype.initialize = function (vid, model) {
-			if (model instanceof Model) {
-				this.model(vid, model);
-			}
-		};
-
-		return ViewManager;
-
-	}());
-
-	ViewStorage = (function () {
-
-		function ViewStorage() {
-			var views = {};
-			this.allViews = function () {
-				return views;
-			};
-		}
-
-		return ViewStorage;
-
-	}());
-
-	ViewListManager = (function () {
-
-		function ViewListManager() {
-			var predicates = new Predicates(),
-				attributes = {};
-			this.allAttributes = function () {
-				return attributes;
-			};
-			this.predicates = function () {
-				return predicates;
-			};
-		}
-		ViewListManager.prototype.allViewLists = function () {
-			return viewListStorage.allViewLists();
-		};
-		ViewListManager.prototype.allModelLists = function () {
-			return modelListStorage.allModelLists();
-		};
-		ViewListManager.prototype.allPredicates = function () {
-			return this.predicates().allPredicates();
-		};
-		ViewListManager.prototype.predicatesFor = function (lid) {
-			return this.predicates().predicatesFor(lid);
-		};
-		ViewListManager.prototype.manage = function (lid, viewList) {
-			(this.allViewLists())[lid] = viewList;
-		};
-		ViewListManager.prototype.forget = function (lid) {
-			delete (this.allPredicates())[lid];
-			delete (this.allAttributes())[lid];
-			delete (this.allViewLists())[lid];
-		};
-		ViewListManager.prototype.viewListFor = function (lid) {
-			var attributes = this.allAttributes();
-			return (attributes[lid] || (attributes[lid] = []));
-		};
-		ViewListManager.prototype.get = function (lid, index) {
-			var viewList,
-				i, j,
-				upperBound,
-				lowerBound,
-				vid;
-			if (typeof index === "number") {
-				viewList = this.viewListFor(lid);
-				i = 0;
-				j = viewList.length;
-				if (i < j) {
-					upperBound = j - 1;
-					lowerBound = 0;
-					if (!(index > upperBound || index < lowerBound)) {
-						vid = viewList[index];
-						return (viewStorage.allViews())[vid];
-					}
-				}
-			}
-			return null;
-		};
-		ViewListManager.prototype.set = function (lid, index, view) {
-			var viewList,
-				i, j,
-				upperBound,
-				lowerBound,
-				vid;
-			if (typeof index === "number" && view instanceof View) {
-				viewList = this.viewListFor(lid);
-				i = 0;
-				j = viewList.length;
-				vid = view.vid();
-				if (i === j) {
-					viewList.push(vid);
-				} else {
-					upperBound = j - 1;
-					lowerBound = 0;
-					index = index > upperBound ? j : index < lowerBound ? lowerBound : index ;
-					do {
-						if (viewList[i] === vid) {
-							if (i === index) return ;
-							viewList.splice(i, 1);
-							break;
+				do {
+					model = array[i];
+					if (model instanceof Model) {
+						n = 0;
+						m = modelList.length;
+						if (n < m) {
+							mid = model.mid();
+							do {
+								if (modelList[n] === mid) {
+									modelList.splice(n, 1);
+									break;
+								}
+							} while (++n < m);
 						}
-					} while (++i < j);
-					viewList.splice(index, 0, vid);
+					}
+				} while (++i < j);
+			}
+		}
+	};
+	ModelListManager.prototype.all = function (lid) {
+		var modelList = this.modelListFor(lid),
+			i = 0, j = modelList.length, all = [],
+			allModels,
+			mid,
+			model;
+		if (i < j) {
+			allModels = this.allModels();
+			do {
+				mid = modelList[i];
+				model = allModels[mid];
+				all.push(model);
+			} while (++i < j);
+		}
+		return all;
+	};
+	ModelListManager.prototype.inheritAll = (function () {
+		function hasValue(array, value) {
+			var i = 0, j = array.length;
+			do {
+				if (array[i] === value) return true ;
+			} while (++i < j);
+			return false;
+		}
+		return function (alpha, omega) { //lid, lid
+			var alphaList = this.modelListFor(alpha),
+				omegaList = this.modelListFor(omega),
+				n = alphaList.length, mid;
+			while (n--) { //reverse and unshift
+				mid = alphaList[n];
+				if (hasValue(omegaList, mid) === false) {
+					omegaList.unshift(mid);
 				}
 			}
 		};
-		ViewListManager.prototype.add = function (lid, view) {
-			var viewList,
-				i, j,
-				vid;
-			if (view instanceof View) {
-				viewList = this.viewListFor(lid);
-				i = 0;
-				j = viewList.length;
-				vid = view.vid();
-				if (i < j) {
-					do {
-						if (viewList[i] === vid) return ;
-					} while (++i < j);
+	}());
+	ModelListManager.prototype.indexOf = function (lid, model) {
+		var modelList = this.modelListFor(lid),
+			i = 0, j = modelList.length,
+			mid;
+		if (i < j) {
+			mid = model.mid();
+			do {
+				if (modelList[i] === mid) return i;
+			} while (++i < j);
+		}
+		return -1;
+	};
+	ModelListManager.prototype.ancestor = function (mid, modelList) {
+		var uid = (modelList) ? modelList.lid() : null;
+		return (uid) ? this.setPredicateValue(mid, "ancestor", uid) :
+		(uid = this.getPredicateValue(mid, "ancestor")) ? (this.allModelLists())[uid] : null;
+	};
+	ModelListManager.prototype.initialize = function (lid, pairsList, idKey) {
+		var pairs,
+			model,
+			mid,
+			modelList,
+			allModels,
+			i, j;
+		if ((pairsList || false).constructor === Array) {
+			modelList = this.modelListFor(lid);
+			allModels = this.allModels();
+			for (i = 0, j = pairsList.length; i < j; i = i + 1) {
+				pairs = pairsList[i];
+				model = new Model(pairs, idKey);
+				mid = model.mid();
+				modelList.push(mid);
+			}
+		}
+	};
+
+	function ModelListStorage() {
+		var modelLists = {};
+		this.allModelLists = function () {
+			return modelLists;
+		};
+	}
+
+	function ViewManager() {
+		var predicates = {},
+			attributes = {};
+		this.allPredicates = function () {
+			return predicates;
+		};
+		this.allAttributes = function () {
+			return attributes;
+		};
+	}
+	ViewManager.prototype.allViews = function () {
+		return viewStorage.allViews();
+	};
+	ViewManager.prototype.allModels = function () {
+		return modelStorage.allModels();
+	};
+	ViewManager.prototype.predicatesFor = function (vid) {
+		var predicates = this.allPredicates();
+		return (predicates[vid] || (predicates[vid] = {}));
+	};
+	ViewManager.prototype.attributesFor = function (vid) {
+		var attributes = this.allAttributes();
+		return (attributes[vid] || (attributes[vid] = {}));
+	};
+	ViewManager.prototype.getPredicateValue = function (lid, key) {
+		return (this.predicatesFor(lid))[key];
+	};
+	ViewManager.prototype.setPredicateValue = function (lid, key, value) {
+		(this.predicatesFor(lid))[key] = value;
+	};
+	ViewManager.prototype.manage = function (vid, view) {
+		(this.allViews())[vid] = view;
+	};
+	ViewManager.prototype.forget = function (vid) {
+		delete (this.allPredicates())[vid];
+		delete (this.allAttributes())[vid];
+		delete (this.allViews())[vid];
+	};
+	ViewManager.prototype.ancestor = function (vid, view) {
+		var uid = (view) ? view.vid() : null;
+		return (uid) ? this.setPredicateValue(vid, "ancestor", uid) :
+		(uid = this.getPredicateValue(vid, "ancestor")) ? (this.allViews())[uid] : null;
+	};
+	ViewManager.prototype.model = function (vid, model) {
+		var mid = (model) ? model.mid() : null;
+		return (mid) ? this.setPredicateValue(vid, "model", mid) :
+		(mid = this.getPredicateValue(vid, "model")) ? (this.allModels())[mid] : null;
+	};
+	ViewManager.prototype.initialize = function (vid, model) {
+		if (model instanceof Model) {
+			this.model(vid, model);
+		}
+	};
+
+	function ViewStorage() {
+		var views = {};
+		this.allViews = function () {
+			return views;
+		};
+	}
+
+	function ViewListManager() {
+		var predicates = {},
+			attributes = {};
+		this.allPredicates = function () {
+			return predicates;
+		};
+		this.allAttributes = function () {
+			return attributes;
+		};
+	}
+	ViewListManager.prototype.allViewLists = function () {
+		return viewListStorage.allViewLists();
+	};
+	ViewListManager.prototype.allModelLists = function () {
+		return modelListStorage.allModelLists();
+	};
+	ViewListManager.prototype.predicatesFor = function (lid) {
+		var predicates = this.allPredicates();
+		return (predicates[lid] || (predicates[lid] = {}));
+	};
+	ViewListManager.prototype.getPredicateValue = function (lid, key) {
+		return (this.predicatesFor(lid))[key];
+	};
+	ViewListManager.prototype.setPredicateValue = function (lid, key, value) {
+		(this.predicatesFor(lid))[key] = value;
+	};
+	ViewListManager.prototype.viewListFor = function (lid) {
+		var attributes = this.allAttributes();
+		return (attributes[lid] || (attributes[lid] = []));
+	};
+	ViewListManager.prototype.manage = function (lid, viewList) {
+		(this.allViewLists())[lid] = viewList;
+	};
+	ViewListManager.prototype.forget = function (lid) {
+		delete (this.allPredicates())[lid];
+		delete (this.allAttributes())[lid];
+		delete (this.allViewLists())[lid];
+	};
+	ViewListManager.prototype.get = function (lid, index) {
+		var viewList,
+			i, j,
+			upperBound,
+			lowerBound,
+			vid;
+		if (typeof index === "number") {
+			viewList = this.viewListFor(lid);
+			i = 0;
+			j = viewList.length;
+			if (i < j) {
+				upperBound = j - 1;
+				lowerBound = 0;
+				if (!(index > upperBound || index < lowerBound)) {
+					vid = viewList[index];
+					return (viewStorage.allViews())[vid];
 				}
+			}
+		}
+		return null;
+	};
+	ViewListManager.prototype.set = function (lid, index, view) {
+		var viewList,
+			i, j,
+			upperBound,
+			lowerBound,
+			vid;
+		if (typeof index === "number" && view instanceof View) {
+			viewList = this.viewListFor(lid);
+			i = 0;
+			j = viewList.length;
+			vid = view.vid();
+			if (i === j) {
 				viewList.push(vid);
+			} else {
+				upperBound = j - 1;
+				lowerBound = 0;
+				index = index > upperBound ? j : index < lowerBound ? lowerBound : index ;
+				do {
+					if (viewList[i] === vid) {
+						if (i === index) return ;
+						viewList.splice(i, 1);
+						break;
+					}
+				} while (++i < j);
+				viewList.splice(index, 0, vid);
 			}
-		};
-		ViewListManager.prototype.addEach = function (lid, array) {
-			var i, j,
-				viewList,
-				view,
-				vid,
-				n, m;
-			if ((array || false).constructor === Array) {
-				i = 0;
-				j = array.length;
-				if (i < j) {
-					viewList = this.viewListFor(lid);
-					do {
-						view = array[i];
-						if (view instanceof View) {
-							n = 0;
-							m = viewList.length;
-							vid = view.vid();
+		}
+	};
+	ViewListManager.prototype.add = function (lid, view) {
+		var viewList,
+			i, j,
+			vid;
+		if (view instanceof View) {
+			viewList = this.viewListFor(lid);
+			i = 0;
+			j = viewList.length;
+			vid = view.vid();
+			if (i < j) {
+				do {
+					if (viewList[i] === vid) return ;
+				} while (++i < j);
+			}
+			viewList.push(vid);
+		}
+	};
+	ViewListManager.prototype.addEach = function (lid, array) {
+		var i, j,
+			viewList,
+			view,
+			vid,
+			n, m;
+		if ((array || false).constructor === Array) {
+			i = 0;
+			j = array.length;
+			if (i < j) {
+				viewList = this.viewListFor(lid);
+				do {
+					view = array[i];
+					if (view instanceof View) {
+						n = 0;
+						m = viewList.length;
+						vid = view.vid();
+						if (n === m) {
+							viewList.push(vid);
+						} else {
+							do {
+								if (viewList[n] === vid) {
+									break;
+								}
+							} while (++n < m);
 							if (n === m) {
 								viewList.push(vid);
-							} else {
-								do {
-									if (viewList[n] === vid) {
-										break;
-									}
-								} while (++n < m);
-								if (n === m) {
-									viewList.push(vid);
-								}
 							}
 						}
-					} while (++i < j);
-				}
-			}
-		};
-		ViewListManager.prototype.remove = function (lid, view) {
-			var viewList,
-				i, j,
-				vid;
-			if (view instanceof View) {
-				viewList = this.viewListFor(lid);
-				i = 0;
-				j = viewList.length;
-				if (i < j) {
-					vid = view.vid();
-					do {
-						if (viewList[i] === vid) {
-							viewList.splice(i, 1);
-							break;
-						}
-					} while (++i < j);
-				}
-			}
-		};
-		ViewListManager.prototype.removeEach = function (lid, array) {
-			var i, j,
-				viewList,
-				view,
-				vid,
-				n, m;
-			if ((array || false).constructor === Array) {
-				i = 0;
-				j = array.length;
-				if (i < j) {
-					viewList = this.viewListFor(lid);
-					do {
-						view = array[i];
-						if (view instanceof View) {
-							n = 0;
-							m = viewList.length;
-							if (n < m) {
-								vid = view.vid();
-								do {
-									if (viewList[n] === vid) {
-										viewList.splice(n, 1);
-										break;
-									}
-								} while (++n < m);
-							}
-						}
-					} while (++i < j);
-				}
-			}
-		};
-		ViewListManager.prototype.all = function (lid) {
-			var viewList = this.viewListFor(lid),
-				i = 0, j = viewList.length, all = [],
-				allViews,
-				vid,
-				view;
-			if (i < j) {
-				allViews = viewStorage.allViews();
-				do {
-					vid = viewList[i];
-					view = allViews[vid];
-					all.push(view);
+					}
 				} while (++i < j);
 			}
-			return all;
-		};
-		ViewListManager.prototype.indexOf = function (lid, view) {
-			var viewList = this.viewListFor(lid),
-				i = 0, j = viewList.length,
-				vid;
+		}
+	};
+	ViewListManager.prototype.remove = function (lid, view) {
+		var viewList,
+			i, j,
+			vid;
+		if (view instanceof View) {
+			viewList = this.viewListFor(lid);
+			i = 0;
+			j = viewList.length;
 			if (i < j) {
 				vid = view.vid();
 				do {
-					if (viewList[i] === vid) return i;
+					if (viewList[i] === vid) {
+						viewList.splice(i, 1);
+						break;
+					}
 				} while (++i < j);
 			}
-			return -1;
-		};
-		ViewListManager.prototype.ancestor = function (lid, viewList) {
-			var uid = (viewList) ? viewList.lid() : null;
-			return (uid) ? this.predicates().set(lid, "ancestor", uid) :
-			(uid = this.predicates().get(lid, "ancestor")) ? (this.allViewLists())[uid] : null;
-		};
-		ViewListManager.prototype.modelList = function (lid, modelList) {
-			var uid = (modelList) ? modelList.lid() : null;
-			return (uid) ? this.predicates().set(lid, "modelList", uid) :
-			(uid = this.predicates().get(lid, "modelList")) ? (this.allModelLists())[uid] : null;
-		};
-		ViewListManager.prototype.initialize = function (lid, modelList) {
-			var viewList,
-				allModels,
-				i, j,
-				model,
-				view,
-				vid;
-			if (modelList instanceof ModelList) {
-				this.modelList(lid, modelList);
-				viewList = this.viewListFor(lid);
-				allModels = modelList.all();
-				for (i = 0, j = allModels.length; i < j; i = i + 1) {
-					model = allModels[i];
-					view = new View(model);
-					vid = view.vid();
-					viewList.push(vid);
-				}
-			}
-		};
-
-		return ViewListManager;
-
-	}());
-
-	ViewListStorage = (function () {
-
-		function ViewListStorage() {
-			var viewLists = {};
-			this.allViewLists = function () {
-				return viewLists;
-			};
 		}
+	};
+	ViewListManager.prototype.removeEach = function (lid, array) {
+		var i, j,
+			viewList,
+			view,
+			vid,
+			n, m;
+		if ((array || false).constructor === Array) {
+			i = 0;
+			j = array.length;
+			if (i < j) {
+				viewList = this.viewListFor(lid);
+				do {
+					view = array[i];
+					if (view instanceof View) {
+						n = 0;
+						m = viewList.length;
+						if (n < m) {
+							vid = view.vid();
+							do {
+								if (viewList[n] === vid) {
+									viewList.splice(n, 1);
+									break;
+								}
+							} while (++n < m);
+						}
+					}
+				} while (++i < j);
+			}
+		}
+	};
+	ViewListManager.prototype.all = function (lid) {
+		var viewList = this.viewListFor(lid),
+			i = 0, j = viewList.length, all = [],
+			allViews,
+			vid,
+			view;
+		if (i < j) {
+			allViews = viewStorage.allViews();
+			do {
+				vid = viewList[i];
+				view = allViews[vid];
+				all.push(view);
+			} while (++i < j);
+		}
+		return all;
+	};
+	ViewListManager.prototype.indexOf = function (lid, view) {
+		var viewList = this.viewListFor(lid),
+			i = 0, j = viewList.length,
+			vid;
+		if (i < j) {
+			vid = view.vid();
+			do {
+				if (viewList[i] === vid) return i;
+			} while (++i < j);
+		}
+		return -1;
+	};
+	ViewListManager.prototype.ancestor = function (lid, viewList) {
+		var uid = (viewList) ? viewList.lid() : null;
+		return (uid) ? this.setPredicateValue(lid, "ancestor", uid) :
+		(uid = this.getPredicateValue(lid, "ancestor")) ? (this.allViewLists())[uid] : null;
+	};
+	ViewListManager.prototype.modelList = function (lid, modelList) {
+		var uid = (modelList) ? modelList.lid() : null;
+		return (uid) ? this.setPredicateValue(lid, "modelList", uid) :
+		(uid = this.getPredicateValue(lid, "modelList")) ? (this.allModelLists())[uid] : null;
+	};
+	ViewListManager.prototype.initialize = function (lid, modelList) {
+		var viewList,
+			allModels,
+			i, j,
+			model,
+			view,
+			vid;
+		if (modelList instanceof ModelList) {
+			this.modelList(lid, modelList);
+			viewList = this.viewListFor(lid);
+			allModels = modelList.all();
+			for (i = 0, j = allModels.length; i < j; i = i + 1) {
+				model = allModels[i];
+				view = new View(model);
+				vid = view.vid();
+				viewList.push(vid);
+			}
+		}
+	};
 
-		return ViewListStorage;
-
-	}());
+	function ViewListStorage() {
+		var viewLists = {};
+		this.allViewLists = function () {
+			return viewLists;
+		};
+	}
 
 	Model = (function () {
 
@@ -1516,6 +1455,7 @@ var Pattern = (function () {
 
 	function Controller() {}
 
+	eventManager = new EventManager();
 	modelManager = new ModelManager();
 	modelStorage = new ModelStorage();
 	modelListManager = new ModelListManager();
