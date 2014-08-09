@@ -529,7 +529,7 @@ var Pattern = (function () {
 				upperBound,
 				lowerBound,
 				mid;
-			if (typeof index === "number") {
+			if (typeof index === "number" && model instanceof Model) {
 				modelList = this.modelListFor(lid);
 				i = 0;
 				j = modelList.length;
@@ -871,7 +871,7 @@ var Pattern = (function () {
 				upperBound,
 				lowerBound,
 				vid;
-			if (typeof index === "number") {
+			if (typeof index === "number" && view instanceof View) {
 				viewList = this.viewListFor(lid);
 				i = 0;
 				j = viewList.length;
@@ -894,28 +894,103 @@ var Pattern = (function () {
 			}
 		};
 		ViewListManager.prototype.add = function (lid, view) {
-			var viewList = this.viewListFor(lid),
-				i = 0, j = viewList.length,
+			var viewList,
+				i, j,
+				vid;
+			if (view instanceof View) {
+				viewList = this.viewListFor(lid);
+				i = 0;
+				j = viewList.length;
 				vid = view.vid();
-			if (i < j) {
-				do {
-					if (viewList[i] === vid) return ;
-				} while (++i < j);
+				if (i < j) {
+					do {
+						if (viewList[i] === vid) return ;
+					} while (++i < j);
+				}
+				viewList.push(vid);
 			}
-			viewList.push(vid);
+		};
+		ViewListManager.prototype.addEach = function (lid, array) {
+			var i, j,
+				viewList,
+				view,
+				vid,
+				n, m;
+			if ((array || false).constructor === Array) {
+				i = 0;
+				j = array.length;
+				if (i < j) {
+					viewList = this.viewListFor(lid);
+					do {
+						view = array[i];
+						if (view instanceof View) {
+							n = 0;
+							m = viewList.length;
+							vid = view.vid();
+							if (n === m) {
+								viewList.push(vid);
+							} else {
+								do {
+									if (viewList[n] === vid) {
+										break;
+									}
+								} while (++n < m);
+								if (n === m) {
+									viewList.push(vid);
+								}
+							}
+						}
+					} while (++i < j);
+				}
+			}
 		};
 		ViewListManager.prototype.remove = function (lid, view) {
-			var viewList = this.viewListFor(lid),
-				i = 0, j = viewList.length,
+			var viewList,
+				i, j,
 				vid;
-			if (i < j) {
-				vid = view.vid();
-				do {
-					if (viewList[i] === vid) {
-						viewList.splice(i, 1);
-						break;
-					}
-				} while (++i < j);
+			if (view instanceof View) {
+				viewList = this.viewListFor(lid);
+				i = 0;
+				j = viewList.length;
+				if (i < j) {
+					vid = view.vid();
+					do {
+						if (viewList[i] === vid) {
+							viewList.splice(i, 1);
+							break;
+						}
+					} while (++i < j);
+				}
+			}
+		};
+		ViewListManager.prototype.removeEach = function (lid, array) {
+			var i, j,
+				viewList,
+				view,
+				vid,
+				n, m;
+			if ((array || false).constructor === Array) {
+				i = 0;
+				j = array.length;
+				if (i < j) {
+					viewList = this.viewListFor(lid);
+					do {
+						view = array[i];
+						if (view instanceof View) {
+							n = 0;
+							m = viewList.length;
+							if (n < m) {
+								vid = view.vid();
+								do {
+									if (viewList[n] === vid) {
+										viewList.splice(n, 1);
+										break;
+									}
+								} while (++n < m);
+							}
+						}
+					} while (++i < j);
+				}
 			}
 		};
 		ViewListManager.prototype.all = function (lid) {
@@ -1413,8 +1488,14 @@ var Pattern = (function () {
 		ViewList.prototype.add = function (view) {
 			viewListManager.add(this.lid(), view);
 		};
+		ViewList.prototype.addEach = function (array) {
+			viewListManager.addEach(this.lid(), array);
+		};
 		ViewList.prototype.remove = function (view) {
 			viewListManager.remove(this.lid(), view);
+		};
+		ViewList.prototype.removeEach = function (array) {
+			viewListManager.removeEach(this.lid(), array);
 		};
 		ViewList.prototype.all = function () {
 			return viewListManager.all(this.lid());
