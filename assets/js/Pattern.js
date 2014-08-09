@@ -166,7 +166,7 @@ var Pattern = (function () {
 			eventManager.publish(eventType, {
 				current: current,
 				changed: changed,
-				model: (modelManager.allModels())[mid]
+				model: (this.allModels())[mid]
 			});
 		};
 		ModelManager.prototype.reportAll = function (eventType, mid, keys) {
@@ -183,7 +183,7 @@ var Pattern = (function () {
 			eventManager.publish(eventType, {
 				current: current,
 				changed: changed,
-				model: (modelManager.allModels())[mid]
+				model: (this.allModels())[mid]
 			});
 		};
 		ModelManager.prototype.initialize = function (mid, pairs, idKey) {
@@ -552,58 +552,103 @@ var Pattern = (function () {
 			}
 		};
 		ModelListManager.prototype.add = function (lid, model) {
-			var modelList = this.modelListFor(lid),
-				i = 0, j = modelList.length,
-				mid = model.mid();
-			if (i < j) {
-				do {
-					if (modelList[i] === mid) return ;
-				} while (++i < j);
-			}
-			modelList.push(mid);
-		};
-		ModelListManager.prototype.addEach = function (lid, array) {
 			var modelList,
 				i, j,
-				mid,
-				model;
-			if ((array || false).constructor === Array) {
+				mid;
+			if (model instanceof Model) {
 				modelList = this.modelListFor(lid);
 				i = 0;
 				j = modelList.length;
+				mid = model.mid();
 				if (i < j) {
-
-				} else { //only add but dedupe
-
+					do {
+						if (modelList[i] === mid) return ;
+					} while (++i < j);
+				}
+				modelList.push(mid);
+			}
+		};
+		ModelListManager.prototype.addEach = function (lid, array) {
+			var i, j,
+				modelList,
+				model,
+				mid,
+				n, m;
+			if ((array || false).constructor === Array) {
+				i = 0;
+				j = array.length;
+				if (i < j) {
+					modelList = this.modelListFor(lid);
+					do {
+						model = array[i];
+						if (model instanceof Model) {
+							n = 0;
+							m = modelList.length;
+							mid = model.mid();
+							if (n === m) {
+								modelList.push(mid);
+							} else {
+								do {
+									if (modelList[n] === mid) {
+										break;
+									}
+								} while (++n < m);
+								if (n === m) {
+									modelList.push(mid);
+								}
+							}
+						}
+					} while (++i < j);
 				}
 			}
 		};
 		ModelListManager.prototype.remove = function (lid, model) {
-			var modelList = this.modelListFor(lid),
-				i = 0, j = modelList.length,
-				mid;
-			if (i < j) {
-				mid = model.mid();
-				do {
-					if (modelList[i] === mid) {
-						modelList.splice(i, 1);
-						break;
-					}
-				} while (++i < j);
-			}
-		};
-		ModelListManager.prototype.removeEach = function (lid, array) {
 			var modelList,
 				i, j,
-				mid,
-				model;
-			if ((array || false).constructor === Array) {
+				mid;
+			if (model instanceof Model) {
 				modelList = this.modelListFor(lid);
 				i = 0;
 				j = modelList.length;
 				if (i < j) {
-
-				} // nothing to remove
+					mid = model.mid();
+					do {
+						if (modelList[i] === mid) {
+							modelList.splice(i, 1);
+							break;
+						}
+					} while (++i < j);
+				}
+			}
+		};
+		ModelListManager.prototype.removeEach = function (lid, array) {
+			var i, j,
+				modelList,
+				model,
+				mid,
+				n, m;
+			if ((array || false).constructor === Array) {
+				i = 0;
+				j = array.length;
+				if (i < j) {
+					modelList = this.modelListFor(lid);
+					do {
+						model = array[i];
+						if (model instanceof Model) {
+							n = 0;
+							m = modelList.length;
+							if (n < m) {
+								mid = model.mid();
+								do {
+									if (modelList[n] === mid) {
+										modelList.splice(n, 1);
+										break;
+									}
+								} while (++n < m);
+							}
+						}
+					} while (++i < j);
+				}
 			}
 		};
 		ModelListManager.prototype.all = function (lid) {
@@ -1398,14 +1443,14 @@ var Pattern = (function () {
 	viewStorage = new ViewStorage();
 	viewListManager = new ViewListManager();
 	viewListStorage = new ViewListStorage();
-
+	/*
 	window.pattern = {
 		modelStorage: modelStorage,
 		modelListStorage: modelListStorage,
 		viewStorage: viewStorage,
 		viewListStorage: viewListStorage
 	};
-
+	*/
 	return {
 
 		Model: Model,
