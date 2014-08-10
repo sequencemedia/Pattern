@@ -42,10 +42,29 @@ var Pattern = (function () {
 		var hasOwnProperty = Object.prototype.hasOwnProperty;
 
 		function ObjectEngine() { }
+		ObjectEngine.prototype.has = function (object, key) {
+			return hasOwnProperty.call(object, key);
+		};
+		ObjectEngine.prototype.mix = (function () {
+			function mix (alpha, omega) {
+				var key;
+				for (key in alpha) {
+					if (hasOwnProperty.call(alpha, key) === true) {
+						if (hasOwnProperty.call(omega, key) === false) {
+							omega[key] = alpha[key];
+						}
+					}
+				}
+				return omega;
+			}
+			return function (alpha, omega) {
+				return mix(mix({}, (alpha || false).constructor === Object ? alpha : {}), (omega || false).constructor === Object ? omega : {});
+			};
+		}());
 		ObjectEngine.prototype.inherit = function (alpha, omega) {
 			var key;
-			alpha = (alpha || false).constructor !== Boolean ? alpha : {};
-			omega = (omega || false).constructor !== Boolean ? omega : {};
+			alpha = (alpha || false).constructor === Function ? alpha : function () { };
+			omega = (omega || false).constructor === Function ? omega : function () { };
 			for (key in alpha) {
 				if (hasOwnProperty.call(alpha, key) === true) {
 					if (hasOwnProperty.call(omega, key) === false) {
@@ -72,10 +91,11 @@ var Pattern = (function () {
 		}
 
 		function ArrayEngine() { }
-		ArrayEngine.prototype.indexOf = indexOf;
-		ArrayEngine.prototype.inherit = function () { };
-		ArrayEngine.prototype.merge = (function() {
-			function merge(alpha, omega) {
+		ArrayEngine.prototype.has = function (array, value) {
+			return indexOf(array, value) !== null;
+		};
+		ArrayEngine.prototype.mix = (function() {
+			function mix(alpha, omega) {
 				var i = 0,
 					j = omega.length,
 					value;
@@ -88,7 +108,7 @@ var Pattern = (function () {
 				return alpha;
 			}
 			return function (alpha, omega) {
-				return merge(merge([], (alpha || false).constructor === Array ? alpha : []), (omega || false).constructor === Array ? omega : []); //return merge((alpha || false).constructor === Array ? alpha : [], (omega || false).constructor === Array ? omega : []);
+				return mix(mix([], (alpha || false).constructor === Array ? alpha : []), (omega || false).constructor === Array ? omega : []); //return mix((alpha || false).constructor === Array ? alpha : [], (omega || false).constructor === Array ? omega : []);
 			};
 
 		}());
@@ -447,7 +467,7 @@ var Pattern = (function () {
 		}
 	};
 	ModelManager.prototype.resetAll = function (mid) {
-		var currentValues = this.currentValuesFor(mid), key, value, KEY, changedKeys = [];
+		var currentValues = this.currentValuesFor(mid), key, KEY, value, changedKeys = [];
 		for (key in currentValues) {
 			KEY = key === "id" ? this.getIDKey(mid) : key;
 			value = currentValues[KEY];
@@ -469,6 +489,20 @@ var Pattern = (function () {
 		}
 		if (changedKeys.length > 0) this.report("resetAll", mid, changedKeys);
 	};
+	ModelManager.prototype.inherit = (function () {
+		var has = Object.prototype.hasOwnProperty;
+		return function (alpha, omega) { //lid, lid
+			var alphaValues = this.currentValuesFor(alpha),
+				omegaValues = this.currentValuesFor(omega),
+				key, KEY;
+			for (key in alphaValues) {
+				KEY = key === "id" ? this.getIDKey(omega) : key;
+				if (has.call(omegaValues, KEY) !== true) {
+					omegaValues[KEY] = alphaValues[KEY];
+				}
+			}
+		};
+	}());
 	ModelManager.prototype.ancestor = function (mid, model) {
 		var uid = (model) ? model.mid() : null;
 		return (uid) ? this.setPredicateValue(mid, "ancestor", uid) :
@@ -695,8 +729,8 @@ var Pattern = (function () {
 		}
 		return all;
 	};
-	ModelListManager.prototype.inheritAll = (function () {
-		function hasValue(array, value) {
+	ModelListManager.prototype.inherit = (function () {
+		function has(array, value) {
 			var i = 0, j = array.length;
 			do {
 				if (array[i] === value) return true ;
@@ -709,7 +743,7 @@ var Pattern = (function () {
 				n = alphaList.length, mid;
 			while (n--) { //reverse and unshift
 				mid = alphaList[n];
-				if (hasValue(omegaList, mid) === false) {
+				if (has(omegaList, mid) === false) {
 					omegaList.unshift(mid);
 				}
 			}
@@ -1075,8 +1109,10 @@ var Pattern = (function () {
 
 		var descendant = (function () {
 			function initialize(ancestor, pairs, idKey) {
+				var mid;
 				ancestor.constructor.call(this, pairs, idKey);
-				modelManager.ancestor(this.mid(), ancestor);
+				modelManager.ancestor(mid = this.mid(), ancestor);
+				modelManager.inherit(ancestor.mid(), mid);
 			}
 			return function (pairs, idKey) {
 
@@ -1084,8 +1120,8 @@ var Pattern = (function () {
 
 					var prototype = new ancestor.constructor();
 
-					function Model(pairs, idKey) {
-						initialize.call(this, ancestor, inheritAll(ancestorPairs, pairs), idKey || ancestorIdKey);
+					function Model(pairs, idKey) { //merge the pairs object
+						initialize.call(this, ancestor, objectEngine.mix(ancestorPairs, pairs), idKey || ancestorIdKey);
 					}
 					Model.prototype = prototype;
 					Model.prototype.ancestor = function () {
@@ -1213,7 +1249,7 @@ var Pattern = (function () {
 				var lid;
 				ancestor.constructor.call(this, pairsList, idKey);
 				modelListManager.ancestor(lid = this.lid(), ancestor);
-				modelListManager.inheritAll(ancestor.lid(), lid);
+				modelListManager.inherit(ancestor.lid(), lid);
 			}
 			return function (pairsList, idKey) {
 
@@ -1221,8 +1257,8 @@ var Pattern = (function () {
 
 					var prototype = new ancestor.constructor();
 
-					function ModelList(pairsList, idKey) { //merge the ancestorPairsList
-						initialize.call(this, ancestor, arrayEngine.merge(ancestorPairsList, pairsList), idKey || ancestorIdKey);
+					function ModelList(pairsList, idKey) { //merge the ancestorPairsList array
+						initialize.call(this, ancestor, arrayEngine.mix(ancestorPairsList, pairsList), idKey || ancestorIdKey);
 					}
 					ModelList.prototype = ancestor;
 					ModelList.prototype.ancestor = function () {
@@ -1243,7 +1279,7 @@ var Pattern = (function () {
 				var lid;
 				ancestor.constructor.call(this, pairsList, idKey);
 				modelListManager.ancestor(lid = this.lid(), ancestor);
-				modelListManager.inheritAll(ancestor.lid(), lid);
+				modelListManager.inherit(ancestor.lid(), lid);
 			}
 			return function (pairsList, idKey) {
 
@@ -1251,8 +1287,8 @@ var Pattern = (function () {
 
 					var prototype = new ancestor.constructor();
 
-					function ModelList(pairsList, idKey) { //don't merge the ancestorPairsList
-						initialize.call(this, ancestor, pairsList, idKey || ancestorIdKey);
+					function ModelList(pairsList, idKey) { //don't merge the ancestorPairsList array
+						initialize.call(this, ancestor, pairsList || ancestorPairsList, idKey || ancestorIdKey);
 					}
 					ModelList.prototype = ancestor;
 					ModelList.prototype.ancestor = function () {
