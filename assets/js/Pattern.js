@@ -2,7 +2,8 @@ var Pattern = (function () {
 
 	"use strict";
 
-	var createUID,
+	var inherit,
+		createUID,
 		ObjectEngine,
 		objectEngine,
 		ArrayEngine,
@@ -25,6 +26,23 @@ var Pattern = (function () {
 	function createMID(uid) { return "mid-" + uid; }
 	function createVID(uid) { return "vid-" + uid; }
 	function createCID(uid) { return "cid-" + uid; }
+
+	inherit = (function () {
+		var has = Object.prototype.hasOwnProperty
+		return function inherit(alpha, omega) {
+			var key;
+			alpha = (alpha || false).constructor === Function ? alpha : function () { };
+			omega = (omega || false).constructor === Function ? omega : function () { };
+			for (key in alpha) {
+				if (has.call(alpha, key) === true) {
+					if (has.call(omega, key) === false) {
+						omega[key] = alpha[key];
+					}
+				}
+			}
+			return omega;
+		};
+	}());
 
 	createUID = (function () {
 		var uidPattern = "nn-n-n-n-nnn",
@@ -61,19 +79,6 @@ var Pattern = (function () {
 				return mix(mix({}, (alpha || false).constructor === Object ? alpha : {}), (omega || false).constructor === Object ? omega : {});
 			};
 		}());
-		ObjectEngine.prototype.inherit = function (alpha, omega) {
-			var key;
-			alpha = (alpha || false).constructor === Function ? alpha : function () { };
-			omega = (omega || false).constructor === Function ? omega : function () { };
-			for (key in alpha) {
-				if (hasOwnProperty.call(alpha, key) === true) {
-					if (hasOwnProperty.call(omega, key) === false) {
-						omega[key] = alpha[key];
-					}
-				}
-			}
-			return omega;
-		};
 
 		return ObjectEngine;
 
@@ -99,7 +104,7 @@ var Pattern = (function () {
 				var i = 0,
 					j = omega.length,
 					value;
-				for (i, j; i < j; i = i + 1) {
+				for (i, j; i < j; i = i + 1) { //because i and j may be zero
 					value = omega[i];
 					if (indexOf(alpha, value) === null) {
 						alpha.push(value);
@@ -816,11 +821,11 @@ var Pattern = (function () {
 		var attributes = this.allAttributes();
 		return (attributes[vid] || (attributes[vid] = {}));
 	};
-	ViewManager.prototype.getPredicateValue = function (lid, key) {
-		return (this.predicatesFor(lid))[key];
+	ViewManager.prototype.getPredicateValue = function (vid, key) {
+		return (this.predicatesFor(vid))[key];
 	};
-	ViewManager.prototype.setPredicateValue = function (lid, key, value) {
-		(this.predicatesFor(lid))[key] = value;
+	ViewManager.prototype.setPredicateValue = function (vid, key, value) {
+		(this.predicatesFor(vid))[key] = value;
 	};
 	ViewManager.prototype.manage = function (vid, view) {
 		(this.allViews())[vid] = view;
@@ -1130,7 +1135,7 @@ var Pattern = (function () {
 
 					modelManager.forget(prototype.mid());
 
-					return objectEngine.inherit(ancestor.constructor, Model);
+					return inherit(ancestor.constructor, Model);
 
 				}(this instanceof Model ? this : new this(pairs, idKey), pairs, idKey));
 
@@ -1267,7 +1272,7 @@ var Pattern = (function () {
 
 					modelListManager.forget(prototype.lid());
 
-					return objectEngine.inherit(ancestor.constructor, ModelList);
+					return inherit(ancestor.constructor, ModelList);
 
 				}(this, pairsList, idKey));
 
@@ -1283,12 +1288,12 @@ var Pattern = (function () {
 			}
 			return function (pairsList, idKey) {
 
-				return (function (ancestor, ancestorPairsList, ancestorIdKey) {
+				return (function (ancestor, ancestorIdKey) { //inherits ancestor models with modelListManager.inherit()
 
 					var prototype = new ancestor.constructor();
 
-					function ModelList(pairsList, idKey) { //don't merge the ancestorPairsList array
-						initialize.call(this, ancestor, pairsList || ancestorPairsList, idKey || ancestorIdKey);
+					function ModelList(pairsList, idKey) {
+						initialize.call(this, ancestor, pairsList, idKey || ancestorIdKey);
 					}
 					ModelList.prototype = ancestor;
 					ModelList.prototype.ancestor = function () {
@@ -1297,9 +1302,9 @@ var Pattern = (function () {
 
 					modelListManager.forget(prototype.lid());
 
-					return objectEngine.inherit(ancestor.constructor, ModelList);
+					return inherit(ancestor.constructor, ModelList);
 
-				}(new this(pairsList, idKey), pairsList, idKey));
+				}(new this(pairsList, idKey), idKey));
 
 			};
 		}());
@@ -1321,8 +1326,8 @@ var Pattern = (function () {
 
 					var prototype = new ancestor.constructor();
 
-					function View(model) { //ancestor.constructor.call(this, model);
-						initialize.call(this, ancestor, model || ancestorModel);
+					function View(model) {
+						initialize.call(this, ancestor, model || ancestorModel || ancestor.model());
 					}
 					View.prototype = prototype;
 					View.prototype.ancestor = function () {
@@ -1331,7 +1336,7 @@ var Pattern = (function () {
 
 					viewManager.forget(prototype.vid());
 
-					return objectEngine.inherit(ancestor.constructor, View);
+					return inherit(ancestor.constructor, View);
 
 				}(this instanceof View ? this : new this(model), model));
 
@@ -1377,7 +1382,7 @@ var Pattern = (function () {
 					var prototype = new ancestor.constructor();
 
 					function ViewList(modelList) {
-						initialize.call(this, ancestor, modelList || ancestorModelList);
+						initialize.call(this, ancestor, modelList || ancestorModelList || ancestor.modelList());
 					}
 					ViewList.prototype = prototype;
 					ViewList.prototype.ancestor = function () {
@@ -1386,7 +1391,7 @@ var Pattern = (function () {
 
 					viewListManager.forget(prototype.lid());
 
-					return objectEngine.inherit(ancestor.constructor, ViewList);
+					return inherit(ancestor.constructor, ViewList);
 
 				}(this instanceof ViewList ? this : new this(modelList), modelList));
 
