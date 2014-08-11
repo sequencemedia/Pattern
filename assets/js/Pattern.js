@@ -28,7 +28,7 @@ var Pattern = (function () {
 	function createCID(uid) { return "cid-" + uid; }
 
 	inherit = (function () {
-		var has = Object.prototype.hasOwnProperty
+		var has = Object.prototype.hasOwnProperty;
 		return function inherit(alpha, omega) {
 			var key;
 			alpha = (alpha || false).constructor === Function ? alpha : function () { };
