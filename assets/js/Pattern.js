@@ -163,6 +163,7 @@ var Pattern = (function () {
 			subscription.handler.call(context, parameters);
 		}
 	};
+	/*
 	EventManager.prototype.publishAll = function (uid, keys, parameters) {
 		var key,
 			subscriptions,
@@ -181,6 +182,7 @@ var Pattern = (function () {
 			}
 		}
 	};
+	*/
 	EventManager.prototype.subscriptionsFor = function (uid, key) {
 		var subscriptions = this.allSubscriptions();
 		return (subscriptions[uid] || (subscriptions[uid] = {}))[key] || (subscriptions[uid][key] = []);
@@ -300,6 +302,7 @@ var Pattern = (function () {
 			model: (this.allModels())[mid]
 		});
 	};
+	/*
 	ModelManager.prototype.reportAll = function (mid, keys) {
 		var KEY, key,
 			changedValues = this.changedValuesFor(mid),
@@ -317,6 +320,7 @@ var Pattern = (function () {
 			model: (this.allModels())[mid]
 		});
 	};
+	*/
 	ModelManager.prototype.manage = function (mid, model) {
 		(this.allModels())[mid] = model;
 	};
@@ -370,9 +374,9 @@ var Pattern = (function () {
 		}
 	};
 	ModelManager.prototype.setEach = function (mid, pairs) {
-		var key, KEY, value, changedKeys;
+		var key, KEY, value/*, changedKeys*/;
 		if ((pairs || false).constructor === Object) {
-			changedKeys = [];
+			//changedKeys = [];
 			for (key in pairs) {
 				KEY = key === "id" ? this.getIDKey(mid) : key;
 				value = pairs[key]; //use external key!
@@ -381,26 +385,26 @@ var Pattern = (function () {
 						this.setChangedValue(mid, KEY, this.getCurrentValue(mid, KEY));
 						this.setCurrentValue(mid, KEY, value);
 						this.report(mid, key);
-						changedKeys.push(key);
+						//changedKeys.push(key);
 					}
 				}
 			}
-			if (changedKeys.length > 0) this.reportAll(mid, changedKeys); // "setEach"
+			//if (changedKeys.length > 0) this.reportAll(mid, changedKeys); // "setEach"
 		}
 	};
 	ModelManager.prototype.setAll = function (mid, value) {
-		var key, currentValues = this.currentValuesFor(mid), changedKeys = [];
+		var key, currentValues = this.currentValuesFor(mid)/*, changedKeys = []*/;
 		for (key in currentValues) {
 			if (!this.isCurrentValue(mid, key, value)) {
 				if (this.validate(mid, key, value)) {
 					this.setChangedValue(mid, key, this.getCurrentValue(mid, key));
 					this.setCurrentValue(mid, key, value);
 					this.report(mid, key);
-					changedKeys.push(key);
+					//changedKeys.push(key);
 				}
 			}
 		}
-		if (changedKeys.length > 0) this.reportAll(mid, changedKeys); // "setAll"
+		//if (changedKeys.length > 0) this.reportAll(mid, changedKeys); // "setAll"
 	};
 	ModelManager.prototype.zed = function (mid, key) {
 		var KEY = key === "id" ? this.getIDKey(mid) : key,
@@ -412,10 +416,10 @@ var Pattern = (function () {
 		}
 	};
 	ModelManager.prototype.zedEach = function (mid, keys) {
-		var changedValues, changedKeys, i, j, key, KEY, value;
+		var changedValues/*, changedKeys*/, i, j, key, KEY, value;
 		if ((keys || false).constructor === Array) {
 			changedValues = this.changedValuesFor(mid);
-			changedKeys = [];
+			//changedKeys = [];
 			for (i = 0, j = keys.length; i < j; i = i + 1) {
 				key = keys[i];
 				KEY = key === "id" ? this.getIDKey(mid) : key;
@@ -425,25 +429,25 @@ var Pattern = (function () {
 						this.setChangedValue(mid, KEY, this.getCurrentValue(mid, KEY));
 						this.setCurrentValue(mid, KEY, value);
 						this.report(mid, key);
-						changedKeys.push(key);
+						//changedKeys.push(key);
 					}
 				}
 			}
-			if (changedKeys.length > 0) this.reportAll(mid, changedKeys); // "zedEach"
+			//if (changedKeys.length > 0) this.reportAll(mid, changedKeys); // "zedEach"
 		}
 	};
 	ModelManager.prototype.zedAll = function (mid) {
-		var key, changedValues = this.changedValuesFor(mid), value, changedKeys = [];
+		var key, changedValues = this.changedValuesFor(mid), value/*, changedKeys = []*/;
 		for (key in changedValues) {
 			value = changedValues[key]; //implicitly is changed
 			if (!this.isCurrentValue(mid, key, value)) {
 				this.setChangedValue(mid, key, this.getCurrentValue(mid, key));
 				this.setCurrentValue(mid, key, value);
 				this.report(mid, key);
-				changedKeys.push(key);
+				//changedKeys.push(key);
 			}
 		}
-		if (changedKeys.length > 0) this.reportAll(mid, changedKeys); // "zedAll"
+		//if (changedKeys.length > 0) this.reportAll(mid, changedKeys); // "zedAll"
 	};
 	ModelManager.prototype.unset = function (mid, key) {
 		var KEY = key === "id" ? this.getIDKey(mid) : key,
@@ -458,10 +462,10 @@ var Pattern = (function () {
 		}
 	};
 	ModelManager.prototype.unsetEach = function (mid, keys) {
-		var currentValues, changedKeys, i, j, key, KEY, value;
+		var currentValues/*, changedKeys*/, i, j, key, KEY, value;
 		if ((keys || false).constructor === Array) {
 			currentValues = this.currentValuesFor(mid);
-			changedKeys = [];
+			//changedKeys = [];
 			for (i = 0, j = keys.length; i < j; i = i + 1) {
 				key = keys[i];
 				KEY = key === "id" ? this.getIDKey(mid) : key;
@@ -472,14 +476,14 @@ var Pattern = (function () {
 					}
 					delete currentValues[KEY];
 					this.report(mid, key);
-					changedKeys.push(key);
+					//changedKeys.push(key);
 				}
 			}
-			if (changedKeys.length > 0) this.reportAll(mid, changedKeys); // "unsetEach"
+			//if (changedKeys.length > 0) this.reportAll(mid, changedKeys); // "unsetEach"
 		}
 	};
 	ModelManager.prototype.unsetAll = function (mid) {
-		var key, currentValues = this.currentValuesFor(mid), value, /* KEY = this.getIDKey(mid), */ changedKeys = [];
+		var key, currentValues = this.currentValuesFor(mid), value/*, KEY = this.getIDKey(mid) *//*, changedKeys = []*/;
 		for (key in currentValues) {
 			value = currentValues[key];
 			if (!this.isChangedValue(mid, key, value)) {
@@ -487,9 +491,9 @@ var Pattern = (function () {
 			}
 			delete currentValues[key];
 			this.report(mid, key);
-			changedKeys.push(key);
+			//changedKeys.push(key);
 		}
-		if (changedKeys.length > 0) this.reportAll(mid, changedKeys); //"unsetAll"
+		//if (changedKeys.length > 0) this.reportAll(mid, changedKeys); //"unsetAll"
 	};
 	ModelManager.prototype.reset = function (mid, key) {
 		var KEY = key === "id" ? this.getIDKey(mid) : key,
@@ -510,10 +514,10 @@ var Pattern = (function () {
 		}
 	};
 	ModelManager.prototype.resetEach = function (mid, keys) {
-		var currentValues, changedKeys, i, j, key, KEY, value;
+		var currentValues/*, changedKeys*/, i, j, key, KEY, value;
 		if ((keys || false).constructor === Array) {
 			currentValues = this.currentValuesFor(mid);
-			changedKeys = [];
+			//changedKeys = [];
 			for (i = 0, j = keys.length; i < j; i = i + 1) {
 				key = keys[i];
 				KEY = key === "id" ? this.getIDKey(mid) : key;
@@ -524,21 +528,21 @@ var Pattern = (function () {
 					}
 					delete currentValues[KEY];
 					this.report(mid, key);
-					changedKeys.push(key);
+					//changedKeys.push(key);
 				} else {
 					if (!this.isDefaultValue(mid, KEY, value)) { //reset
 						this.setChangedValue(mid, KEY, value);
 						this.setCurrentValue(mid, KEY, this.getDefaultValue(mid, KEY));
 						this.report(mid, key);
-						changedKeys.push(key);
+						//changedKeys.push(key);
 					}
 				}
 			}
-			if (changedKeys.length > 0) this.reportAll(mid, changedKeys); // "resetEach"
+			//if (changedKeys.length > 0) this.reportAll(mid, changedKeys); // "resetEach"
 		}
 	};
 	ModelManager.prototype.resetAll = function (mid) {
-		var currentValues = this.currentValuesFor(mid), key, KEY, value, changedKeys = [];
+		var currentValues = this.currentValuesFor(mid), key, KEY, value/*, changedKeys = []*/;
 		for (key in currentValues) {
 			KEY = key === "id" ? this.getIDKey(mid) : key;
 			value = currentValues[KEY];
@@ -548,17 +552,17 @@ var Pattern = (function () {
 				}
 				delete currentValues[KEY];
 				this.report(mid, key);
-				changedKeys.push(key);
+				//changedKeys.push(key);
 			} else {
 				if (!this.isDefaultValue(mid, KEY, value)) { //reset
 					this.setChangedValue(mid, KEY, value);
 					this.setCurrentValue(mid, KEY, this.getDefaultValue(mid, KEY));
 					this.report(mid, key);
-					changedKeys.push(key);
+					//changedKeys.push(key);
 				}
 			}
 		}
-		if (changedKeys.length > 0) this.reportAll(mid, changedKeys); // "resetAll"
+		//if (changedKeys.length > 0) this.reportAll(mid, changedKeys); // "resetAll"
 	};
 	ModelManager.prototype.inherit = (function () {
 		var has = Object.prototype.hasOwnProperty;
@@ -626,6 +630,12 @@ var Pattern = (function () {
 	ModelListManager.prototype.modelListFor = function (lid) {
 		var attributes = this.allAttributes();
 		return (attributes[lid] || (attributes[lid] = []));
+	};
+	ModelListManager.prototype.report = function (lid, key, mid) {
+		eventManager.publish(lid, key, {
+			modelList: (this.allModelLists())[lid],
+			model: (this.allModels())[mid]
+		});
 	};
 	ModelListManager.prototype.manage = function (lid, modelList) {
 		(this.allModelLists())[lid] = modelList;
@@ -699,6 +709,7 @@ var Pattern = (function () {
 				} while (++i < j);
 			}
 			modelList.push(mid);
+			this.report(lid, "add", mid);
 		}
 	};
 	ModelListManager.prototype.addEach = function (lid, array) {
@@ -728,6 +739,7 @@ var Pattern = (function () {
 							} while (++n < m);
 							if (n === m) {
 								modelList.push(mid);
+								this.report(lid, "add", mid);
 							}
 						}
 					}
@@ -748,6 +760,7 @@ var Pattern = (function () {
 				do {
 					if (modelList[i] === mid) {
 						modelList.splice(i, 1);
+						this.report(lid, "remove", mid);
 						break;
 					}
 				} while (++i < j);
@@ -775,6 +788,7 @@ var Pattern = (function () {
 							do {
 								if (modelList[n] === mid) {
 									modelList.splice(n, 1);
+									this.report(lid, "remove", mid);
 									break;
 								}
 							} while (++n < m);
@@ -915,7 +929,7 @@ var Pattern = (function () {
 
 	};
 	ViewManager.prototype.subscribe = function (vid, mid) {
-		eventManager.subscribe(vid, mid, { id: function (event) { throw "ID"; } });
+		eventManager.subscribe(vid, mid, { id: function (event) { /* console.log(event); */ throw "ID"; } });
 	};
 
 	function ViewStorage() {
@@ -1177,7 +1191,7 @@ var Pattern = (function () {
 		}
 	};
 	ViewListManager.prototype.subscribe = function (lid, uid) {
-		eventManager.subscribe(lid, uid, { id: function (event) { throw "ID"; } });
+		eventManager.subscribe(lid, uid, { add: function (event) { /* console.log(event); */ throw "add"; }, remove: function (event) { /* console.log(event); */ throw "remove"; } });
 	};
 
 	function ViewListStorage() {
