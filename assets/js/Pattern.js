@@ -163,26 +163,6 @@ var Pattern = (function () {
 			subscription.handler.call(context, parameters);
 		}
 	};
-	/*
-	EventManager.prototype.publishAll = function (uid, keys, parameters) {
-		var key,
-			subscriptions,
-			i,
-			j,
-			subscription,
-			context;
-		while (key = keys.shift()) {
-			subscriptions = this.subscriptionsFor(uid, key);
-				i = 0;
-				j = subscriptions.length;
-			for (i, j; i < j; i = i + 1) {
-				subscription = subscriptions[i];
-				context = this.contextFor(subscription.cid);
-				subscription.handler.call(context, parameters);
-			}
-		}
-	};
-	*/
 	EventManager.prototype.subscriptionsFor = function (uid, key) {
 		var subscriptions = this.allSubscriptions();
 		return (subscriptions[uid] || (subscriptions[uid] = {}))[key] || (subscriptions[uid][key] = []);
@@ -613,7 +593,7 @@ var Pattern = (function () {
 			if (i === j) {
 				modelList.push(mid);
 			} else {
-				upperBound = j - 1; //no need to max() because j > 0
+				upperBound = j - 1; //j > 0
 				lowerBound = 0;
 				index = index > upperBound ? j : index < lowerBound ? lowerBound : index ;
 				do {
