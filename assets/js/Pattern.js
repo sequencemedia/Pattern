@@ -292,35 +292,21 @@ var Pattern = (function () {
 		var validator = (this.validatorsFor(mid))[key];
 		return (validator || false).constructor === Function ? validator(key, value) : true;
 	};
-	ModelManager.prototype.report = function (mid, key) {
-		var KEY = key === "id" ? this.getIDKey(mid) : key,
-			current = this.getCurrentValue(mid, KEY),
-			changed = this.getChangedValue(mid, KEY);
+	ModelManager.prototype.remove = function (mid, key, changed) {
+		(this.changedValuesFor(mid))[key] = changed;
+		delete (this.currentValuesFor(mid))[key];
+	};
+	ModelManager.prototype.change = function (mid, key, changed, current) {
+		(this.changedValuesFor(mid))[key] = changed;
+		(this.currentValuesFor(mid))[key] = current;
+	};
+	ModelManager.prototype.report = function (mid, key, changed, current) {
 		eventManager.publish(mid, key, {
-			current: current,
 			changed: changed,
+			current: current,
 			model: (this.allModels())[mid]
 		});
 	};
-	/*
-	ModelManager.prototype.reportAll = function (mid, keys) {
-		var KEY, key,
-			changedValues = this.changedValuesFor(mid),
-			currentValues = this.currentValuesFor(mid),
-			changed = {},
-			current = {};
-		while (key = keys.shift()) {
-			KEY = key === "id" ? this.getIDKey(mid) : key;
-			changed[key] = changedValues[KEY];
-			current[key] = currentValues[KEY];
-		}
-		eventManager.publishAll(mid, keys, {
-			current: current,
-			changed: changed,
-			model: (this.allModels())[mid]
-		});
-	};
-	*/
 	ModelManager.prototype.manage = function (mid, model) {
 		(this.allModels())[mid] = model;
 	};
@@ -348,8 +334,7 @@ var Pattern = (function () {
 		if ((keys || false).constructor === Array) {
 			pairs = {};
 			for (i = 0, j = keys.length; i < j; i = i + 1) {
-				key = keys[i];
-				KEY = key === "id" ? this.getIDKey(mid) : key;
+				KEY = (key = keys[i]) === "id" ? this.getIDKey(mid) : key;
 				pairs[key] = this.getCurrentValue(mid, KEY);
 			}
 			return pairs;
@@ -364,205 +349,153 @@ var Pattern = (function () {
 		return pairs;
 	};
 	ModelManager.prototype.set = function (mid, key, value) {
-		var KEY = key === "id" ? this.getIDKey(mid) : key;
+		var KEY = key === "id" ? this.getIDKey(mid) : key, currentValue;
 		if (!this.isCurrentValue(mid, KEY, value)) {
 			if (this.validate(mid, KEY, value)) {
-				this.setChangedValue(mid, KEY, this.getCurrentValue(mid, KEY));
-				this.setCurrentValue(mid, KEY, value);
-				this.report(mid, key);
+				this.change(mid, KEY, currentValue = this.getCurrentValue(mid, KEY), value); /* change with internal key */
+				this.report(mid, key, currentValue, value); /* report with external key */
 			}
 		}
 	};
 	ModelManager.prototype.setEach = function (mid, pairs) {
-		var key, KEY, value/*, changedKeys*/;
+		var key, KEY, value, currentValue;
 		if ((pairs || false).constructor === Object) {
-			//changedKeys = [];
 			for (key in pairs) {
 				KEY = key === "id" ? this.getIDKey(mid) : key;
 				value = pairs[key]; //use external key!
 				if (!this.isCurrentValue(mid, KEY, value)) {
 					if (this.validate(mid, KEY, value)) {
-						this.setChangedValue(mid, KEY, this.getCurrentValue(mid, KEY));
-						this.setCurrentValue(mid, KEY, value);
-						this.report(mid, key);
-						//changedKeys.push(key);
+						this.change(mid, KEY, currentValue = this.getCurrentValue(mid, KEY), value); /* change with internal key */
+						this.report(mid, key, currentValue, value); /* report with external key */
 					}
 				}
 			}
-			//if (changedKeys.length > 0) this.reportAll(mid, changedKeys); // "setEach"
 		}
 	};
 	ModelManager.prototype.setAll = function (mid, value) {
-		var key, currentValues = this.currentValuesFor(mid)/*, changedKeys = []*/;
+		var key, currentValues = this.currentValuesFor(mid), currentValue;
 		for (key in currentValues) {
 			if (!this.isCurrentValue(mid, key, value)) {
 				if (this.validate(mid, key, value)) {
-					this.setChangedValue(mid, key, this.getCurrentValue(mid, key));
-					this.setCurrentValue(mid, key, value);
-					this.report(mid, key);
-					//changedKeys.push(key);
+					this.change(mid, key, currentValue = this.getCurrentValue(mid, key), value); /* change with external key */
+					this.report(mid, key, currentValue, value); /* change with external key */
 				}
 			}
 		}
-		//if (changedKeys.length > 0) this.reportAll(mid, changedKeys); // "setAll"
 	};
 	ModelManager.prototype.zed = function (mid, key) {
 		var KEY = key === "id" ? this.getIDKey(mid) : key,
-			value = this.getChangedValue(mid, KEY);
+			value = this.getChangedValue(mid, KEY), currentValue;
 		if (!this.isCurrentValue(mid, KEY, value)) {
-			this.setChangedValue(mid, KEY, this.getCurrentValue(mid, KEY));
-			this.setCurrentValue(mid, KEY, value);
-			this.report(mid, key);
+			this.change(mid, KEY, currentValue = this.getCurrentValue(mid, KEY), value); /* change with internal key */
+			this.report(mid, key, currentValue, value); /* report with external key */
 		}
 	};
 	ModelManager.prototype.zedEach = function (mid, keys) {
-		var changedValues/*, changedKeys*/, i, j, key, KEY, value;
+		var changedValues, i, j, key, KEY, value, currentValue;
 		if ((keys || false).constructor === Array) {
 			changedValues = this.changedValuesFor(mid);
-			//changedKeys = [];
 			for (i = 0, j = keys.length; i < j; i = i + 1) {
-				key = keys[i];
-				KEY = key === "id" ? this.getIDKey(mid) : key;
+				KEY = (key = keys[i]) === "id" ? this.getIDKey(mid) : key;
 				if (KEY in changedValues) { //can't zed unchanged keys
 					value = changedValues[KEY];
 					if (!this.isCurrentValue(mid, KEY, value)) {
-						this.setChangedValue(mid, KEY, this.getCurrentValue(mid, KEY));
-						this.setCurrentValue(mid, KEY, value);
-						this.report(mid, key);
-						//changedKeys.push(key);
+						this.change(mid, KEY, currentValue = this.getCurrentValue(mid, KEY), value); /* change with internal key */
+						this.report(mid, key, currentValue, value); /* report with external key */
 					}
 				}
 			}
-			//if (changedKeys.length > 0) this.reportAll(mid, changedKeys); // "zedEach"
 		}
 	};
 	ModelManager.prototype.zedAll = function (mid) {
-		var key, changedValues = this.changedValuesFor(mid), value/*, changedKeys = []*/;
+		var key, changedValues = this.changedValuesFor(mid), value, currentValue;
 		for (key in changedValues) {
 			value = changedValues[key]; //implicitly is changed
 			if (!this.isCurrentValue(mid, key, value)) {
-				this.setChangedValue(mid, key, this.getCurrentValue(mid, key));
-				this.setCurrentValue(mid, key, value);
-				this.report(mid, key);
-				//changedKeys.push(key);
+				this.change(mid, key, currentValue = this.getCurrentValue(mid, key), value); /* change with external key */
+				this.report(mid, key, currentValue, value); /* report with external key */
 			}
 		}
-		//if (changedKeys.length > 0) this.reportAll(mid, changedKeys); // "zedAll"
 	};
 	ModelManager.prototype.unset = function (mid, key) {
 		var KEY = key === "id" ? this.getIDKey(mid) : key,
 			currentValues = this.currentValuesFor(mid), value;
 		if (KEY in currentValues) {
 			value = currentValues[KEY];
-			if (!this.isChangedValue(mid, KEY, value)) {
-				this.setChangedValue(mid, KEY, value);
-			}
-			delete currentValues[KEY];
-			this.report(mid, key);
+			this.remove(mid, KEY, value); /* delete with internal key */
+			this.report(mid, key, value); /* report with external key */
 		}
 	};
 	ModelManager.prototype.unsetEach = function (mid, keys) {
-		var currentValues/*, changedKeys*/, i, j, key, KEY, value;
+		var currentValues, i, j, key, KEY, value;
 		if ((keys || false).constructor === Array) {
 			currentValues = this.currentValuesFor(mid);
-			//changedKeys = [];
 			for (i = 0, j = keys.length; i < j; i = i + 1) {
-				key = keys[i];
-				KEY = key === "id" ? this.getIDKey(mid) : key;
+				KEY = (key = keys[i]) === "id" ? this.getIDKey(mid) : key;
 				if (KEY in currentValues) { //can't zed unknown keys
 					value = currentValues[KEY];
-					if (!this.isChangedValue(mid, KEY, value)) {
-						this.setChangedValue(mid, KEY, value);
-					}
-					delete currentValues[KEY];
-					this.report(mid, key);
-					//changedKeys.push(key);
+					this.remove(mid, KEY, value); /* delete with internal key */
+					this.report(mid, key, value); /* report with external key */
 				}
 			}
-			//if (changedKeys.length > 0) this.reportAll(mid, changedKeys); // "unsetEach"
 		}
 	};
 	ModelManager.prototype.unsetAll = function (mid) {
 		var key, currentValues = this.currentValuesFor(mid), value/*, KEY = this.getIDKey(mid) *//*, changedKeys = []*/;
 		for (key in currentValues) {
 			value = currentValues[key];
-			if (!this.isChangedValue(mid, key, value)) {
-				this.setChangedValue(mid, key, value);
-			}
-			delete currentValues[key];
-			this.report(mid, key);
-			//changedKeys.push(key);
+			this.remove(mid, key, value);
+			this.report(mid, key, value);
 		}
-		//if (changedKeys.length > 0) this.reportAll(mid, changedKeys); //"unsetAll"
 	};
 	ModelManager.prototype.reset = function (mid, key) {
 		var KEY = key === "id" ? this.getIDKey(mid) : key,
-			currentValues = this.currentValuesFor(mid), value;
+			currentValues = this.currentValuesFor(mid), value, defaultValue;
 		value = currentValues[KEY];
 		if (!this.isDefaultKey(mid, KEY)) { //unset
-			if (!this.isChangedValue(mid, KEY, value)) {
-				this.setChangedValue(mid, KEY, value);
-			}
-			delete currentValues[KEY];
-			this.report(mid, key);
+			this.remove(mid, KEY, value); /* delete with internal key */
+			this.report(mid, key, value); /* report with external key */
 		} else {
 			if (!this.isDefaultValue(mid, KEY, value)) { //reset
-				this.setChangedValue(mid, KEY, value);
-				this.setCurrentValue(mid, KEY, this.getDefaultValue(mid, KEY));
-				this.report(mid, key);
+				this.change(mid, KEY, value, defaultValue = this.getDefaultValue(mid, KEY)); /* change with internal key */
+				this.report(mid, key, value, defaultValue); /* report with external key */
 			}
 		}
 	};
 	ModelManager.prototype.resetEach = function (mid, keys) {
-		var currentValues/*, changedKeys*/, i, j, key, KEY, value;
+		var currentValues, i, j, key, KEY, value, defaultValue;
 		if ((keys || false).constructor === Array) {
 			currentValues = this.currentValuesFor(mid);
-			//changedKeys = [];
 			for (i = 0, j = keys.length; i < j; i = i + 1) {
-				key = keys[i];
-				KEY = key === "id" ? this.getIDKey(mid) : key;
+				KEY = (key = keys[i]) === "id" ? this.getIDKey(mid) : key;
 				value = currentValues[KEY];
 				if (!this.isDefaultKey(mid, KEY)) { //unset
-					if (!this.isChangedValue(mid, KEY, value)) {
-						this.setChangedValue(mid, KEY, value);
-					}
-					delete currentValues[KEY];
-					this.report(mid, key);
-					//changedKeys.push(key);
+					this.remove(mid, KEY, value); /* delete with internal key */
+					this.report(mid, key, value); /* report with external key */
 				} else {
 					if (!this.isDefaultValue(mid, KEY, value)) { //reset
-						this.setChangedValue(mid, KEY, value);
-						this.setCurrentValue(mid, KEY, this.getDefaultValue(mid, KEY));
-						this.report(mid, key);
-						//changedKeys.push(key);
+						this.change(mid, KEY, value, defaultValue = this.getDefaultValue(mid, KEY)); /* change with internal key */
+						this.report(mid, key, value, defaultValue); /* report with external key */
 					}
 				}
 			}
-			//if (changedKeys.length > 0) this.reportAll(mid, changedKeys); // "resetEach"
 		}
 	};
 	ModelManager.prototype.resetAll = function (mid) {
-		var currentValues = this.currentValuesFor(mid), key, KEY, value/*, changedKeys = []*/;
+		var currentValues = this.currentValuesFor(mid), key, KEY, value/*, changedKeys = []*/, defaultValue;
 		for (key in currentValues) {
 			KEY = key === "id" ? this.getIDKey(mid) : key;
 			value = currentValues[KEY];
 			if (!this.isDefaultKey(mid, KEY)) { //unset
-				if (!this.isChangedValue(mid, KEY, value)) {
-					this.setChangedValue(mid, KEY, value);
-				}
-				delete currentValues[KEY];
-				this.report(mid, key);
-				//changedKeys.push(key);
+				this.remove(mid, KEY, value); /* delete with internal key */
+				this.report(mid, key, value); /* report with external key */
 			} else {
 				if (!this.isDefaultValue(mid, KEY, value)) { //reset
-					this.setChangedValue(mid, KEY, value);
-					this.setCurrentValue(mid, KEY, this.getDefaultValue(mid, KEY));
-					this.report(mid, key);
-					//changedKeys.push(key);
+					this.change(mid, KEY, value, defaultValue = this.getDefaultValue(mid, KEY)); /* change with internal key */
+					this.report(mid, key, value, defaultValue); /* report with external key */
 				}
 			}
 		}
-		//if (changedKeys.length > 0) this.reportAll(mid, changedKeys); // "resetAll"
 	};
 	ModelManager.prototype.inherit = (function () {
 		var has = Object.prototype.hasOwnProperty;
