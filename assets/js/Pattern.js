@@ -272,11 +272,11 @@ var Pattern = (function () {
 		var validator = (this.validatorsFor(mid))[key];
 		return (validator || false).constructor === Function ? validator(key, value) : true;
 	};
-	ModelManager.prototype.remove = function (mid, key, changed) {
+	ModelManager.prototype.removeCurrentValue = function (mid, key, changed) {
 		(this.changedValuesFor(mid))[key] = changed;
 		delete (this.currentValuesFor(mid))[key];
 	};
-	ModelManager.prototype.change = function (mid, key, changed, current) {
+	ModelManager.prototype.updateCurrentValue = function (mid, key, changed, current) {
 		(this.changedValuesFor(mid))[key] = changed;
 		(this.currentValuesFor(mid))[key] = current;
 	};
@@ -332,7 +332,7 @@ var Pattern = (function () {
 		var KEY = key === "id" ? this.getIDKey(mid) : key, currentValue;
 		if (!this.isCurrentValue(mid, KEY, value)) {
 			if (this.validate(mid, KEY, value)) {
-				this.change(mid, KEY, currentValue = this.getCurrentValue(mid, KEY), value); /* change with internal key */
+				this.updateCurrentValue(mid, KEY, currentValue = this.getCurrentValue(mid, KEY), value); /* change with internal key */
 				this.report(mid, key, currentValue, value); /* report with external key */
 			}
 		}
@@ -345,7 +345,7 @@ var Pattern = (function () {
 				value = pairs[key]; //use external key!
 				if (!this.isCurrentValue(mid, KEY, value)) {
 					if (this.validate(mid, KEY, value)) {
-						this.change(mid, KEY, currentValue = this.getCurrentValue(mid, KEY), value); /* change with internal key */
+						this.updateCurrentValue(mid, KEY, currentValue = this.getCurrentValue(mid, KEY), value); /* change with internal key */
 						this.report(mid, key, currentValue, value); /* report with external key */
 					}
 				}
@@ -357,7 +357,7 @@ var Pattern = (function () {
 		for (key in currentValues) {
 			if (!this.isCurrentValue(mid, key, value)) {
 				if (this.validate(mid, key, value)) {
-					this.change(mid, key, currentValue = this.getCurrentValue(mid, key), value); /* change with external key */
+					this.updateCurrentValue(mid, key, currentValue = this.getCurrentValue(mid, key), value); /* change with external key */
 					this.report(mid, key, currentValue, value); /* change with external key */
 				}
 			}
@@ -367,7 +367,7 @@ var Pattern = (function () {
 		var KEY = key === "id" ? this.getIDKey(mid) : key,
 			value = this.getChangedValue(mid, KEY), currentValue;
 		if (!this.isCurrentValue(mid, KEY, value)) {
-			this.change(mid, KEY, currentValue = this.getCurrentValue(mid, KEY), value); /* change with internal key */
+			this.updateCurrentValue(mid, KEY, currentValue = this.getCurrentValue(mid, KEY), value); /* change with internal key */
 			this.report(mid, key, currentValue, value); /* report with external key */
 		}
 	};
@@ -380,7 +380,7 @@ var Pattern = (function () {
 				if (KEY in changedValues) { //can't zed unchanged keys
 					value = changedValues[KEY];
 					if (!this.isCurrentValue(mid, KEY, value)) {
-						this.change(mid, KEY, currentValue = this.getCurrentValue(mid, KEY), value); /* change with internal key */
+						this.updateCurrentValue(mid, KEY, currentValue = this.getCurrentValue(mid, KEY), value); /* change with internal key */
 						this.report(mid, key, currentValue, value); /* report with external key */
 					}
 				}
@@ -392,7 +392,7 @@ var Pattern = (function () {
 		for (key in changedValues) {
 			value = changedValues[key]; //implicitly is changed
 			if (!this.isCurrentValue(mid, key, value)) {
-				this.change(mid, key, currentValue = this.getCurrentValue(mid, key), value); /* change with external key */
+				this.updateCurrentValue(mid, key, currentValue = this.getCurrentValue(mid, key), value); /* change with external key */
 				this.report(mid, key, currentValue, value); /* report with external key */
 			}
 		}
@@ -402,7 +402,7 @@ var Pattern = (function () {
 			currentValues = this.currentValuesFor(mid), value;
 		if (KEY in currentValues) {
 			value = currentValues[KEY];
-			this.remove(mid, KEY, value); /* delete with internal key */
+			this.removeCurrentValue(mid, KEY, value); /* delete with internal key */
 			this.report(mid, key, value); /* report with external key */
 		}
 	};
@@ -414,17 +414,17 @@ var Pattern = (function () {
 				KEY = (key = keys[i]) === "id" ? this.getIDKey(mid) : key;
 				if (KEY in currentValues) { //can't zed unknown keys
 					value = currentValues[KEY];
-					this.remove(mid, KEY, value); /* delete with internal key */
+					this.removeCurrentValue(mid, KEY, value); /* delete with internal key */
 					this.report(mid, key, value); /* report with external key */
 				}
 			}
 		}
 	};
 	ModelManager.prototype.unsetAll = function (mid) {
-		var key, currentValues = this.currentValuesFor(mid), value/*, KEY = this.getIDKey(mid) *//*, changedKeys = []*/;
+		var key, currentValues = this.currentValuesFor(mid), value;
 		for (key in currentValues) {
 			value = currentValues[key];
-			this.remove(mid, key, value);
+			this.removeCurrentValue(mid, key, value);
 			this.report(mid, key, value);
 		}
 	};
@@ -433,11 +433,11 @@ var Pattern = (function () {
 			currentValues = this.currentValuesFor(mid), value, defaultValue;
 		value = currentValues[KEY];
 		if (!this.isDefaultKey(mid, KEY)) { //unset
-			this.remove(mid, KEY, value); /* delete with internal key */
+			this.removeCurrentValue(mid, KEY, value); /* delete with internal key */
 			this.report(mid, key, value); /* report with external key */
 		} else {
 			if (!this.isDefaultValue(mid, KEY, value)) { //reset
-				this.change(mid, KEY, value, defaultValue = this.getDefaultValue(mid, KEY)); /* change with internal key */
+				this.updateCurrentValue(mid, KEY, value, defaultValue = this.getDefaultValue(mid, KEY)); /* change with internal key */
 				this.report(mid, key, value, defaultValue); /* report with external key */
 			}
 		}
@@ -450,11 +450,11 @@ var Pattern = (function () {
 				KEY = (key = keys[i]) === "id" ? this.getIDKey(mid) : key;
 				value = currentValues[KEY];
 				if (!this.isDefaultKey(mid, KEY)) { //unset
-					this.remove(mid, KEY, value); /* delete with internal key */
+					this.removeCurrentValue(mid, KEY, value); /* delete with internal key */
 					this.report(mid, key, value); /* report with external key */
 				} else {
 					if (!this.isDefaultValue(mid, KEY, value)) { //reset
-						this.change(mid, KEY, value, defaultValue = this.getDefaultValue(mid, KEY)); /* change with internal key */
+						this.updateCurrentValue(mid, KEY, value, defaultValue = this.getDefaultValue(mid, KEY)); /* change with internal key */
 						this.report(mid, key, value, defaultValue); /* report with external key */
 					}
 				}
@@ -462,16 +462,16 @@ var Pattern = (function () {
 		}
 	};
 	ModelManager.prototype.resetAll = function (mid) {
-		var currentValues = this.currentValuesFor(mid), key, KEY, value/*, changedKeys = []*/, defaultValue;
+		var currentValues = this.currentValuesFor(mid), key, KEY, value, defaultValue;
 		for (key in currentValues) {
 			KEY = key === "id" ? this.getIDKey(mid) : key;
 			value = currentValues[KEY];
 			if (!this.isDefaultKey(mid, KEY)) { //unset
-				this.remove(mid, KEY, value); /* delete with internal key */
+				this.removeCurrentValue(mid, KEY, value); /* delete with internal key */
 				this.report(mid, key, value); /* report with external key */
 			} else {
 				if (!this.isDefaultValue(mid, KEY, value)) { //reset
-					this.change(mid, KEY, value, defaultValue = this.getDefaultValue(mid, KEY)); /* change with internal key */
+					this.updateCurrentValue(mid, KEY, value, defaultValue = this.getDefaultValue(mid, KEY)); /* change with internal key */
 					this.report(mid, key, value, defaultValue); /* report with external key */
 				}
 			}
