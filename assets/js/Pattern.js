@@ -45,13 +45,9 @@ var Pattern = (function () {
 	}());
 
 	createUID = (function () {
-		var uidPattern = "nn-n-n-n-nnn",
-			expression = /n/ig;
-		function uid() {
-			return Math.floor((1 + Math.random()) * 0x10000).toString(16).substring(1);
-		}
+		var count = 1e9;
 		return function () {
-			return uidPattern.replace(expression, uid);
+			return (count = count + 1).toString(16);
 		};
 	}());
 
@@ -497,12 +493,15 @@ var Pattern = (function () {
 		(uid = this.getPredicateValue(mid, "ancestor")) ? (this.allModels())[uid] : null;
 	};
 	ModelManager.prototype.initialize = function (mid, pairs, idKey) {
-		var key, value;
+		var key, value,
+			defaultValues = this.defaultValuesFor(mid),
+			changedValues = this.changedValuesFor(mid),
+			currentValues = this.currentValuesFor(mid);
 		for (key in pairs) {
 			value = pairs[key];
-			this.setDefaultValue(mid, key, value);
-			this.setChangedValue(mid, key, value);
-			this.setCurrentValue(mid, key, value);
+			defaultValues[key] = value;
+			changedValues[key] = value;
+			currentValues[key] = value;
 		}
 		if (idKey !== this.getIDKey(mid)) this.setIDKey(mid, idKey);
 	};
