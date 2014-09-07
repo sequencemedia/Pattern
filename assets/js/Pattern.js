@@ -2,12 +2,8 @@ var Pattern = (function () {
 
 	"use strict";
 
-	var inherit,
+	var pattern,
 		createUID,
-		ObjectEngine,
-		objectEngine,
-		ArrayEngine,
-		arrayEngine,
 		eventManager,
 		modelManager,
 		modelStorage,
@@ -17,105 +13,109 @@ var Pattern = (function () {
 		viewStorage,
 		viewListManager,
 		viewListStorage,
+		controllerManager,
+		controllerStorage,
 		Model,
 		ModelList,
 		View,
-		ViewList;
+		ViewList,
+		Controller;
 
 	function createLID(uid) { return "lid-" + uid; }
 	function createMID(uid) { return "mid-" + uid; }
 	function createVID(uid) { return "vid-" + uid; }
 	function createCID(uid) { return "cid-" + uid; }
 
-	inherit = (function () {
-		var has = Object.prototype.hasOwnProperty;
-		return function inherit(alpha, omega) {
-			var key;
-			alpha = (alpha || false).constructor === Function ? alpha : function () { };
-			omega = (omega || false).constructor === Function ? omega : function () { };
-			for (key in alpha) {
-				if (has.call(alpha, key) === true) {
-					if (has.call(omega, key) === false) {
-						omega[key] = alpha[key];
+	pattern = {
+		inherit: (function () {
+			var has = Object.prototype.hasOwnProperty;
+			return function inherit(alpha, omega) {
+				var key;
+				alpha = (alpha || false).constructor === Function ? alpha : function () { };
+				omega = (omega || false).constructor === Function ? omega : function () { };
+				for (key in alpha) {
+					if (has.call(alpha, key) === true) {
+						if (has.call(omega, key) === false) {
+							omega[key] = alpha[key];
+						}
 					}
 				}
+				return omega;
+			};
+		}()),
+		list : (function () {
+			function indexOf(array, value) {
+				var i = 0,
+					j = array.length;
+				do {
+					if (array[i] === value) return i;
+				} while (++i < j);
+				return null;
 			}
-			return omega;
-		};
-	}());
+			return {
+				has: function (array, value) {
+					return indexOf(array, value) !== null;
+				},
+				mix: (function() {
+					function mix(alpha, omega) {
+						var i = 0,
+							j = omega.length,
+							value;
+						for (i, j; i < j; i = i + 1) { //because i and j may be zero
+							value = omega[i];
+							if (indexOf(alpha, value) === null) {
+								alpha.push(value);
+							}
+						}
+						return alpha;
+					}
+					return function (alpha, omega) {
+						return mix(mix([], (alpha || false).constructor === Array ? alpha : []), (omega || false).constructor === Array ? omega : []); //return mix((alpha || false).constructor === Array ? alpha : [], (omega || false).constructor === Array ? omega : []);
+					};
+				}())
+			};
+		}()),
+		hash : (function () {
+			var has = Object.prototype.hasOwnProperty;
+			return {
+				has: function (object, key) {
+					return has.call(object, key);
+				},
+				mix: (function () {
+					function mix (alpha, omega) {
+						var key;
+						for (key in alpha) {
+							if (has.call(alpha, key) === true) {
+								if (has.call(omega, key) === false) {
+									omega[key] = alpha[key];
+								}
+							}
+						}
+						return omega;
+					}
+					return function (alpha, omega) {
+						return mix(mix({}, (alpha || false).constructor === Object ? alpha : {}), (omega || false).constructor === Object ? omega : {});
+					};
+				}())
+			}
+		}())
+	};
+
+	function Map() { this.map = {}; };
+	Map.prototype.get = function (lid, mid) {
+		return (this.map[lid] || (this.map[lid] = {}))[mid] || null;
+	};
+	Map.prototype.set = function (lid, mid, vid) {
+		(this.map[lid] || (this.map[lid] = {}))[mid] = vid;
+	};
+
+	var map = new Map();
 
 	createUID = (function () {
 		var count = 1e9;
 		return function () {
 			return (count = count + 1).toString(16);
 		};
-	}());
-
-	ObjectEngine = (function () {
-
-		var hasOwnProperty = Object.prototype.hasOwnProperty;
-
-		function ObjectEngine() { }
-		ObjectEngine.prototype.has = function (object, key) {
-			return hasOwnProperty.call(object, key);
-		};
-		ObjectEngine.prototype.mix = (function () {
-			function mix (alpha, omega) {
-				var key;
-				for (key in alpha) {
-					if (hasOwnProperty.call(alpha, key) === true) {
-						if (hasOwnProperty.call(omega, key) === false) {
-							omega[key] = alpha[key];
-						}
-					}
-				}
-				return omega;
-			}
-			return function (alpha, omega) {
-				return mix(mix({}, (alpha || false).constructor === Object ? alpha : {}), (omega || false).constructor === Object ? omega : {});
-			};
-		}());
-
-		return ObjectEngine;
-
-	}());
-
-	ArrayEngine = (function () {
-
-		function indexOf(array, value) {
-			var i = 0,
-				j = array.length;
-			do {
-				if (array[i] === value) return i;
-			} while (++i < j);
-			return null;
-		}
-
-		function ArrayEngine() { }
-		ArrayEngine.prototype.has = function (array, value) {
-			return indexOf(array, value) !== null;
-		};
-		ArrayEngine.prototype.mix = (function() {
-			function mix(alpha, omega) {
-				var i = 0,
-					j = omega.length,
-					value;
-				for (i, j; i < j; i = i + 1) { //because i and j may be zero
-					value = omega[i];
-					if (indexOf(alpha, value) === null) {
-						alpha.push(value);
-					}
-				}
-				return alpha;
-			}
-			return function (alpha, omega) {
-				return mix(mix([], (alpha || false).constructor === Array ? alpha : []), (omega || false).constructor === Array ? omega : []); //return mix((alpha || false).constructor === Array ? alpha : [], (omega || false).constructor === Array ? omega : []);
-			};
-
-		}());
-
-		return ArrayEngine;
-
 	}());
 
 	function EventManager() {
@@ -136,8 +136,11 @@ var Pattern = (function () {
 	EventManager.prototype.allViewLists = function () {
 		return viewListStorage.allViewLists();
 	};
+	EventManager.prototype.allControllers = function () {
+		return controllerStorage.allControllers();
+	};
 	EventManager.prototype.contextFor = function (uid) {
-		return (this.allViews())[uid] || (this.allViewLists())[uid];
+		return (this.allViews())[uid] || (this.allViewLists())[uid] || (this.allControllers())[uid];
 	};
 	/*
 	EventManager.prototype.on = function () { };
@@ -147,7 +150,7 @@ var Pattern = (function () {
 	EventManager.prototype.post = function () { };
 	EventManager.prototype.postList = function () { };
 	*/
-	EventManager.prototype.publish = function (uid, key, parameters) {
+	EventManager.prototype.publish = function (uid, key, parameters) { //console.log(uid, key, parameters);
 		var subscriptions = this.subscriptionsFor(uid, key),
 			i = 0,
 			j = subscriptions.length,
@@ -163,13 +166,25 @@ var Pattern = (function () {
 		var subscriptions = this.allSubscriptions();
 		return (subscriptions[uid] || (subscriptions[uid] = {}))[key] || (subscriptions[uid][key] = []);
 	};
-	EventManager.prototype.subscribe = function (subscriber, publisher, parameters) {
+	EventManager.prototype.subscribe = function (subscriber, publisher, parameters) { //console.log(subscriber, publisher, parameters);
+		/*
+			TODO: Subscription attach/detach -- subscribe/endSubscription
+		*/
 		var key, subscriptions, handler;
 		for (key in parameters) {
 			if (typeof (handler = parameters[key]) === "function") {
 				subscriptions = this.subscriptionsFor(publisher, key);
 				subscriptions.push({ cid: subscriber, handler: handler });
 			}
+		}
+	};
+	EventManager.prototype.unsubscribe = function (subscriber, publisher) { //console.log(subscriber, publisher);
+		/*
+			TODO: Subscription attach/detach -- subscribe/endSubscription
+		*/
+		var subscriptions = this.allSubscriptions()[publisher];
+		if (subscriptions) {
+
 		}
 	};
 
@@ -202,9 +217,9 @@ var Pattern = (function () {
 	ModelManager.prototype.allModels = function () {
 		return modelStorage.allModels();
 	};
-	ModelManager.prototype.predicatesFor = function (lid) {
+	ModelManager.prototype.predicatesFor = function (mid) {
 		var predicates = this.allPredicates();
-		return (predicates[lid] || (predicates[lid] = {}));
+		return (predicates[mid] || (predicates[mid] = {}));
 	};
 	ModelManager.prototype.getPredicateValue = function (mid, key) {
 		return (this.predicatesFor(mid))[key];
@@ -603,6 +618,7 @@ var Pattern = (function () {
 					}
 				} while (++i < j);
 				modelList.splice(index, 0, mid);
+				//this.report(lid, "set", mid);
 			}
 		}
 	};
@@ -819,6 +835,11 @@ var Pattern = (function () {
 	ViewManager.prototype.setPredicateValue = function (vid, key, value) {
 		(this.predicatesFor(vid))[key] = value;
 	};
+	ViewManager.prototype.report = function (vid, key) {
+		eventManager.publish(vid, key, {
+			view: (this.allViews())[vid]
+		});
+	};
 	ViewManager.prototype.manage = function (vid, view) {
 		(this.allViews())[vid] = view;
 	};
@@ -837,11 +858,19 @@ var Pattern = (function () {
 		return (mid) ? this.setPredicateValue(vid, "model", mid) :
 		(mid = this.getPredicateValue(vid, "model")) ? (this.allModels())[mid] : null;
 	};
-	ViewManager.prototype.initialize = function (vid, mid) {
-
+	ViewManager.prototype.initialize = function (vid, mid, parameters) {
+		//console.error("A Pattern View susbcribes but does not initialize (yet)");
 	};
-	ViewManager.prototype.subscribe = function (vid, mid) {
-		eventManager.subscribe(vid, mid, { id: function (event) { /* console.log(event); */ throw "ID"; } });
+	ViewManager.prototype.subscribe = function (vid, mid, parameters) { //console.log(vid, mid, parameters);
+		eventManager.subscribe(vid, mid, {
+			id: function (event) {
+				eventManager.publish(vid, "id", {
+					view: this,
+					was: event
+				});
+			}
+		});
+		if ("model" in parameters) eventManager.subscribe(vid, mid, parameters.model);
 	};
 
 	function ViewStorage() {
@@ -889,6 +918,12 @@ var Pattern = (function () {
 	ViewListManager.prototype.viewListFor = function (lid) { //lists of instances
 		var attributes = this.allAttributes();
 		return (attributes[lid] || (attributes[lid] = []));
+	};
+	ViewListManager.prototype.report = function (lid, key, vid) {
+		eventManager.publish(lid, key, {
+			viewList: (this.allViewLists())[lid],
+			view: (this.allViews())[vid]
+		});
 	};
 	ViewListManager.prototype.manage = function (lid, viewList) {
 		(this.allViewLists())[lid] = viewList;
@@ -944,13 +979,15 @@ var Pattern = (function () {
 					}
 				} while (++i < j);
 				viewList.splice(index, 0, vid);
+				//this.report(lid, "set", vid);
 			}
 		}
 	};
 	ViewListManager.prototype.add = function (lid, view) {
 		var viewList,
 			i, j,
-			vid;
+			vid,
+			mid;
 		if (view instanceof View) {
 			viewList = this.viewListFor(lid);
 			i = 0;
@@ -961,7 +998,10 @@ var Pattern = (function () {
 					if (viewList[i] === vid) return ;
 				} while (++i < j);
 			}
+			mid = viewManager.getPredicateValue(vid, "model");
 			viewList.push(vid);
+			viewList[mid] = vid;
+			this.report(lid, "add", vid);
 		}
 	};
 	ViewListManager.prototype.addEach = function (lid, array) {
@@ -969,7 +1009,8 @@ var Pattern = (function () {
 			viewList,
 			view,
 			vid,
-			n, m;
+			n, m,
+			mid;
 		if ((array || false).constructor === Array) {
 			i = 0;
 			j = array.length;
@@ -982,7 +1023,10 @@ var Pattern = (function () {
 						m = viewList.length;
 						vid = view.vid();
 						if (n === m) {
+							mid = viewManager.getPredicateValue(vid, "model");
 							viewList.push(vid);
+							viewList[mid] = vid;
+							this.report(lid, "add", vid);
 						} else {
 							do {
 								if (viewList[n] === vid) {
@@ -990,7 +1034,10 @@ var Pattern = (function () {
 								}
 							} while (++n < m);
 							if (n === m) {
+								mid = viewManager.getPredicateValue(vid, "model");
 								viewList.push(vid);
+								viewList[mid] = vid;
+								this.report(lid, "add", vid);
 							}
 						}
 					}
@@ -1001,7 +1048,8 @@ var Pattern = (function () {
 	ViewListManager.prototype.remove = function (lid, view) {
 		var viewList,
 			i, j,
-			vid;
+			vid,
+			mid;
 		if (view instanceof View) {
 			viewList = this.viewListFor(lid);
 			i = 0;
@@ -1010,7 +1058,10 @@ var Pattern = (function () {
 				vid = view.vid();
 				do {
 					if (viewList[i] === vid) {
+						mid = viewManager.getPredicateValue(vid, "model");
 						viewList.splice(i, 1);
+						delete viewList[mid];
+						this.report(lid, "remove", vid);
 						break;
 					}
 				} while (++i < j);
@@ -1022,7 +1073,8 @@ var Pattern = (function () {
 			viewList,
 			view,
 			vid,
-			n, m;
+			n, m
+			mid;
 		if ((array || false).constructor === Array) {
 			i = 0;
 			j = array.length;
@@ -1037,7 +1089,10 @@ var Pattern = (function () {
 							vid = view.vid();
 							do {
 								if (viewList[n] === vid) {
+									mid = viewManager.getPredicateValue(vid, "model");
 									viewList.splice(n, 1);
+									delete viewList[mid];
+									this.report(lid, "remove", vid);
 									break;
 								}
 							} while (++n < m);
@@ -1085,7 +1140,7 @@ var Pattern = (function () {
 		return (uid) ? this.setPredicateValue(lid, "modelList", uid) :
 		(uid = this.getPredicateValue(lid, "modelList")) ? (this.allModelLists())[uid] : null;
 	};
-	ViewListManager.prototype.initialize = function (lid, uid) {
+	ViewListManager.prototype.initialize = function (lid, uid, parameters) { //console.log(lid, uid, parameters);
 		var viewList = this.viewListFor(lid),
 			modelList = this.modelListFor(uid), //modelList.all();
 			allModels = this.allModels(),
@@ -1097,13 +1152,66 @@ var Pattern = (function () {
 		for (i = 0, j = modelList.length; i < j; i = i + 1) {
 			mid = modelList[i];
 			model = allModels[mid];
-			view = new View(model);
+			view = new View(model, parameters);
 			vid = view.vid();
 			viewList.push(vid);
+			viewList[mid] = vid;
 		}
 	};
-	ViewListManager.prototype.subscribe = function (lid, uid) {
-		eventManager.subscribe(lid, uid, { add: function (event) { /* console.log(event); */ throw "add"; }, remove: function (event) { /* console.log(event); */ throw "remove"; } });
+	ViewListManager.prototype.subscribe = function (lid, uid, parameters) {
+		eventManager.subscribe(lid, uid, {
+			add: function (event) { //context is "ViewList" not "ViewListManager"
+				/*
+					TODO: Refine mechanism for mapping from model to view in viewList
+				*/
+				var viewList = viewListManager.viewListFor(lid),
+					model = event.model,
+					mid = model.mid(),
+					view = new View(model, parameters.model),
+					vid = view.vid();
+				viewList.push(vid);
+				viewList[mid] = vid;
+				viewListManager.report(lid, "add", vid);
+				/*
+					END TODO;
+				*/
+				eventManager.publish(lid, "add", {
+					viewList: this,
+					view: view,
+					was: event
+				});
+			},
+			remove: function (event) { //context is "ViewList" not "ViewListManager"
+				/*
+					TODO: Refine mechanism for mapping from model to view in viewList
+				*/
+				var viewList = viewListManager.viewListFor(lid),
+					model = event.model,
+					mid = model.mid(),
+					vid = viewList[mid],
+					i = 0,
+					j = viewList.length;
+				for (i, j; i < j; i = i + 1) {
+					if (viewList[i] === vid) {
+						viewList.splice(i, 1);
+						break;
+					}
+				}
+				delete viewList[mid];
+				viewListManager.report(lid, "remove", vid);
+				/*
+					END TODO;
+				*/
+				eventManager.publish(lid, "remove", {
+					viewList: this,
+					view: (viewListManager.allViews())[vid],
+					was: event
+				});
+			}
+		});
+		if ("modelList" in parameters) {
+			eventManager.subscribe(lid, uid, parameters.modelList);
+		}
 	};
 
 	function ViewListStorage() {
@@ -1129,7 +1237,7 @@ var Pattern = (function () {
 					var prototype = new ancestor.constructor();
 
 					function Model(pairs, idKey) { //merge the pairs object
-						initialize.call(this, ancestor, objectEngine.mix(ancestorPairs, pairs), idKey || ancestorIdKey);
+						initialize.call(this, ancestor, pattern.hash.mix(ancestorPairs, pairs), idKey || ancestorIdKey);
 					}
 					Model.prototype = prototype;
 					Model.prototype.ancestor = function () {
@@ -1138,7 +1246,7 @@ var Pattern = (function () {
 
 					modelManager.forget(prototype.mid());
 
-					return inherit(ancestor.constructor, Model);
+					return pattern.inherit(ancestor.constructor, Model);
 
 				}(this instanceof Model ? this : new this(pairs, idKey), pairs, idKey));
 
@@ -1266,7 +1374,7 @@ var Pattern = (function () {
 					var prototype = new ancestor.constructor();
 
 					function ModelList(pairsList, idKey) { //merge the ancestorPairsList array
-						initialize.call(this, ancestor, arrayEngine.mix(ancestorPairsList, pairsList), idKey || ancestorIdKey);
+						initialize.call(this, ancestor, pattern.list.mix(ancestorPairsList, pairsList), idKey || ancestorIdKey);
 					}
 					ModelList.prototype = ancestor;
 					ModelList.prototype.ancestor = function () {
@@ -1275,7 +1383,7 @@ var Pattern = (function () {
 
 					modelListManager.forget(prototype.lid());
 
-					return inherit(ancestor.constructor, ModelList);
+					return pattern.inherit(ancestor.constructor, ModelList);
 
 				}(this, pairsList, idKey));
 
@@ -1305,7 +1413,7 @@ var Pattern = (function () {
 
 					modelListManager.forget(prototype.lid());
 
-					return inherit(ancestor.constructor, ModelList);
+					return pattern.inherit(ancestor.constructor, ModelList);
 
 				}(new this(pairsList, idKey), idKey));
 
@@ -1319,18 +1427,18 @@ var Pattern = (function () {
 	View = (function () {
 
 		var descendant = (function () {
-			function initialize(ancestor, model) {
-				ancestor.constructor.call(this, model);
+			function initialize(ancestor, model, parameters) {
+				ancestor.constructor.call(this, model, parameters);
 				viewManager.ancestor(this.vid(), ancestor);
 			}
-			return function (model) {
+			return function (model, parameters) {
 
-				return (function (ancestor, ancestorModel) {
+				return (function (ancestor, ancestorModel, ancestorParameters) {
 
 					var prototype = new ancestor.constructor();
 
-					function View(model) {
-						initialize.call(this, ancestor, model || ancestorModel || ancestor.model());
+					function View(model, parameters) {
+						initialize.call(this, ancestor, model || ancestorModel || ancestor.model(), parameters || ancestorParameters);
 					}
 					View.prototype = prototype;
 					View.prototype.ancestor = function () {
@@ -1339,14 +1447,14 @@ var Pattern = (function () {
 
 					viewManager.forget(prototype.vid());
 
-					return inherit(ancestor.constructor, View);
+					return pattern.inherit(ancestor.constructor, View);
 
-				}(this instanceof View ? this : new this(model), model));
+				}(this instanceof View ? this : new this(model, parameters), model, parameters));
 
 			};
 		}());
 
-		function initialize(model) {
+		function initialize(model, parameters) { //console.log(model, parameters);
 			var vid, mid;
 			this.vid = (function (vid) {
 				return function () {
@@ -1356,13 +1464,16 @@ var Pattern = (function () {
 			viewManager.manage(vid, this);
 			if (model instanceof Model) {
 				viewManager.model(vid, model);
-				viewManager.initialize(vid, mid = model.mid());
-				viewManager.subscribe(vid, mid);
+				viewManager.initialize(vid, mid = model.mid(), parameters || (parameters = {}));
+				//viewManager.subscribe(vid, mid, parameters);
+				//viewManager.initialize(vid, mid = model.mid(), parameters || (parameters = {}));
+				viewManager.subscribe(vid, model.mid(), parameters || (parameters = {}));
+
 			}
 		}
 
-		function View(model) {
-			initialize.call(this, model);
+		function View(model, parameters) {
+			initialize.call(this, model, parameters);
 		}
 		View.prototype.model = function () {
 			return viewManager.model(this.vid());
@@ -1378,18 +1489,18 @@ var Pattern = (function () {
 	ViewList = (function () {
 
 		var descendant = (function () {
-			function initialize(ancestor, modelList) {
-				ancestor.constructor.call(this, modelList);
+			function initialize(ancestor, modelList, parameters) {
+				ancestor.constructor.call(this, modelList, parameters);
 				viewListManager.ancestor(this.lid(), ancestor);
 			}
-			return function (modelList) {
+			return function (modelList, parameters) {
 
-				return (function (ancestor, ancestorModelList) {
+				return (function (ancestor, ancestorModelList, ancestorParameters) {
 
 					var prototype = new ancestor.constructor();
 
-					function ViewList(modelList) {
-						initialize.call(this, ancestor, modelList || ancestorModelList || ancestor.modelList());
+					function ViewList(modelList, parameters) {
+						initialize.call(this, ancestor, modelList || ancestorModelList || ancestor.modelList(), parameters || ancestorParameters);
 					}
 					ViewList.prototype = prototype;
 					ViewList.prototype.ancestor = function () {
@@ -1398,14 +1509,14 @@ var Pattern = (function () {
 
 					viewListManager.forget(prototype.lid());
 
-					return inherit(ancestor.constructor, ViewList);
+					return pattern.inherit(ancestor.constructor, ViewList);
 
-				}(this instanceof ViewList ? this : new this(modelList), modelList));
+				}(this instanceof ViewList ? this : new this(modelList, parameters), modelList, parameters));
 
 			};
 		}());
 
-		function initialize(modelList) {
+		function initialize(modelList, parameters) { //console.log(parameters);
 			var lid, uid;
 			this.lid = (function (lid) {
 				return function () {
@@ -1415,13 +1526,13 @@ var Pattern = (function () {
 			viewListManager.manage(lid, this);
 			if (modelList instanceof ModelList) {
 				viewListManager.modelList(lid, modelList);
-				viewListManager.initialize(lid, uid = modelList.lid());
-				viewListManager.subscribe(lid, uid);
+				viewListManager.initialize(lid, uid = modelList.lid(), parameters || (parameters = {}));
+				viewListManager.subscribe(lid, uid, parameters);
 			}
 		}
 
-		function ViewList(modelList) {
-			initialize.call(this, modelList);
+		function ViewList(modelList, parameters) {
+			initialize.call(this, modelList, parameters);
 		}
 		ViewList.prototype.get = function (index) {
 			return viewListManager.get(this.lid(), index);
@@ -1458,10 +1569,156 @@ var Pattern = (function () {
 
 	}());
 
-	function Controller() {}
+	function ControllerManager() {
 
-	objectEngine = new ObjectEngine();
-	arrayEngine = new ArrayEngine();
+		var predicates = {},
+			attributes = {};
+		this.allPredicates = function () {
+			return predicates;
+		};
+		this.allAttributes = function () {
+			return attributes;
+		};
+		this.allViews = function () {
+			return viewStorage.allViews();
+		};
+		this.allViewLists = function () {
+			return viewListStorage.allViewLists();
+		};
+		this.allControllers = function () {
+			return controllerStorage.allControllers();
+		};
+
+	}
+	ControllerManager.prototype.predicatesFor = function (cid) {
+		var predicates = this.allPredicates();
+		return (predicates[cid] || (predicates[cid] = {}));
+	};
+	ControllerManager.prototype.getPredicateValue = function (cid, key) {
+		return (this.predicatesFor(cid))[key];
+	};
+	ControllerManager.prototype.setPredicateValue = function (cid, key, value) {
+		(this.predicatesFor(cid))[key] = value;
+	};
+	ControllerManager.prototype.viewListFor = function (lid) { //lists of instances
+		return viewListManager.viewListFor(lid);
+	};
+	ControllerManager.prototype.viewList = function (cid, viewList) {
+		var uid = (viewList instanceof ViewList) ? viewList.lid() : null;
+		return (uid) ? this.setPredicateValue(cid, "viewList", uid) :
+		(uid = this.getPredicateValue(cid, "viewList")) ? (this.allViewLists())[uid] : null;
+	};
+	ControllerManager.prototype.manage = function (cid, controller) {
+		(this.allControllers())[cid] = controller;
+	};
+	ControllerManager.prototype.forget = function (cid) {
+		delete (this.allControllers())[cid];
+	};
+	ControllerManager.prototype.initialize = function (cid, lid, parameters) {
+		/*
+		var viewList,
+			allViews,
+			i, j,
+			vid,
+			view,
+			model,
+			mid,
+			lid;
+		*/
+		//console.error("A Pattern Controller subscribes but does not initialize.");
+		/*
+		if ("view" in parameters) {
+			viewList = this.viewListFor(lid);
+			allViews = this.allViews();
+			for (i = 0, j = viewList.length; i < j; i = i + 1) {
+				vid = viewList[i];
+				view = allViews[vid];
+				model = view.model();
+				mid = model.mid();
+				eventManager.subscribe(vid, mid, parameters.view);
+			}
+		}
+		if ("viewList" in parameters) {
+			eventManager.subscribe(lid, uid, parameters.viewList);
+		}
+		*/
+	};
+	ControllerManager.prototype.subscribe = function (cid, lid, parameters) { //console.log(cid, lid, parameters);
+		var viewList = this.viewListFor(lid),
+			i, j, vid;
+		for (i = 0, j = viewList.length; i < j; i = i + 1) {
+			vid = viewList[i];
+			eventManager.subscribe(cid, vid, { //controller subscribing to integral view events
+				id: function (event) {
+					eventManager.publish(cid, "id", {
+						controller: this,
+						was: event
+					});
+				}
+			});
+		}
+		if ("view" in parameters) { //controller subscribing to custom view events
+			for (i = 0, j = viewList.length; i < j; i = i + 1) {
+				vid = viewList[i];
+				eventManager.subscribe(cid, vid, parameters.view);
+			}
+		}
+		eventManager.subscribe(cid, lid, { //controller subscribing to integral viewList events
+			add: function (event) {
+				if ("view" in parameters) {
+					eventManager.subscribe(cid, vid, parameters.view); //attachSubscription
+				}
+				eventManager.publish(cid, "add", {
+					controller: this,
+					was: event
+				});
+			},
+			remove: function (event) {
+				if ("view" in parameters) {
+					eventManager.unsubscribe(cid, vid, parameters.view); //detachSubscription
+				}
+				eventManager.publish(cid, "remove", {
+					controller: this,
+					was: event
+				});
+			}
+		});
+		if ("viewList" in parameters) {
+			eventManager.subscribe(cid, lid, parameters.viewList); //controller subscribing to custom view events
+		}
+	};
+
+	function ControllerStorage() {
+		var controllers = {};
+		this.allControllers = function () {
+			return controllers;
+		};
+	}
+
+	Controller = (function () {
+
+		function Controller(viewList, parameters) { //console.log(viewList, parameters);
+			var cid, lid;
+			this.cid = (function (cid) {
+				return function () {
+					return cid;
+				}
+			}(cid = createCID(createUID())));
+			controllerManager.manage(cid, this);
+			if (viewList instanceof ViewList) {
+				controllerManager.viewList(cid, viewList);
+				//controllerManager.initialize(cid, lid = viewList.lid(), parameters || (parameters = {}));
+				//controllerManager.subscribe(cid, lid, parameters);
+				controllerManager.subscribe(cid, viewList.lid(), parameters || (parameters = {}));
+			}
+		}
+		Controller.prototype.viewList = function (viewList) {
+			return controllerManager.viewList(this.cid(), viewList);
+		}
+
+		return Controller;
+
+	}());
 
 	eventManager = new EventManager();
 	modelManager = new ModelManager();
@@ -1472,21 +1729,27 @@ var Pattern = (function () {
 	viewStorage = new ViewStorage();
 	viewListManager = new ViewListManager();
 	viewListStorage = new ViewListStorage();
-	/*
-	window.pattern = {
-		modelStorage: modelStorage,
-		modelListStorage: modelListStorage,
-		viewStorage: viewStorage,
-		viewListStorage: viewListStorage
-	};
-	*/
+	controllerManager = new ControllerManager();
+	controllerStorage = new ControllerStorage();
+
 	return {
 
 		Model: Model,
 		ModelList: ModelList,
 		View: View,
 		ViewList: ViewList,
-		Controller: Controller
+		Controller: Controller,
+
+		uid: (function () {
+			var uidPattern = "nn-n-n-n-nnn",
+				expression = /n/ig;
+			function uid() {
+				return Math.floor((1 + Math.random()) * 0x10000).toString(16).substring(1);
+			}
+			return function () {
+				return uidPattern.replace(expression, uid);
+			};
+		}())
 
 	};
 
