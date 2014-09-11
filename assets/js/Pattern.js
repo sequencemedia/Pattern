@@ -578,7 +578,7 @@ var Pattern = (function () {
 	};
 	ModelListManager.prototype.internal = {
 		pending: function (lid, key, mid) {
-			channels.internal.publish(lid, key, {
+			channels.internal.pending(lid, key, {
 				modelList: (modelListStorage.allModelLists())[lid],
 				model: (modelStorage.allModels())[mid]
 			});
