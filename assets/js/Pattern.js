@@ -146,10 +146,10 @@ var Pattern = (function () {
 			var keys = this.keysFor(uid);
 			return (keys[key] || (keys[key] = {}));
 		};
-		Channel.prototype.pending = function (uid, key, parameters) { //console.log("Channel.prototype.pending()", uid, key, parameters);
+		Channel.prototype.pending = function (uid, key, parameters) {
 			this.allPending().push({ uid: uid, key: key, parameters: parameters });
 		};
-		Channel.prototype.publish = function (uid, key, parameters) { //console.log("Channel.prototype.publish()", uid, key, parameters);
+		Channel.prototype.publish = function (uid, key, parameters) {
 			var subscriptions = this.subscriptionsFor(uid, key),
 				subscriber,
 				handler,
@@ -604,7 +604,7 @@ var Pattern = (function () {
 			});
 		}
 	};
-	ModelListManager.prototype.pending = function (lid, key, mid) { //console.log("ModelListManager.prototype.pending()", lid, key, mid);
+	ModelListManager.prototype.pending = function (lid, key, mid) {
 		var parameters = {
 			modelList: (this.allModelLists())[lid],
 			model: (this.allModels())[mid]
@@ -612,7 +612,7 @@ var Pattern = (function () {
 		channels.internal.pending(lid, key, parameters);
 		channels.external.pending(lid, key, parameters);
 	};
-	ModelListManager.prototype.publish = function (lid, key, mid) { //console.log("ModelListManager.prototype.publish()", lid, key, mid);
+	ModelListManager.prototype.publish = function (lid, key, mid) {
 		var parameters = {
 			modelList: (this.allModelLists())[lid],
 			model: (this.allModels())[mid]
@@ -935,7 +935,7 @@ var Pattern = (function () {
 	ViewManager.prototype.initialize = function (vid, mid, parameters) {
 		//console.error("A Pattern View susbcribes but does not initialize (yet)");
 	};
-	ViewManager.prototype.subscribe = function (vid, mid, parameters) { //console.log(vid, mid, parameters);
+	ViewManager.prototype.subscribe = function (vid, mid, parameters) {
 		if ("model" in parameters) channels.external.createSubscription(vid, mid, parameters.model);
 	};
 
@@ -981,6 +981,9 @@ var Pattern = (function () {
 	ViewListManager.prototype.modelListFor = function (lid) { //lists of instances
 		return modelListManager.modelListFor(lid);
 	};
+	ViewListManager.prototype.modelFor = function (vid) {
+		return viewManager.getPredicateValue(vid, "model");
+	};
 	ViewListManager.prototype.viewListFor = function (lid) { //lists of instances
 		var attributes = this.allAttributes();
 		return (attributes[lid] || (attributes[lid] = []));
@@ -1013,7 +1016,7 @@ var Pattern = (function () {
 			});
 		}
 	};
-	ViewListManager.prototype.pending = function (lid, key, vid) { console.log("ViewListManager.prototype.pending()", lid, key, vid);
+	ViewListManager.prototype.pending = function (lid, key, vid) {
 		var parameters = {
 			viewList: (this.allViewLists())[lid],
 			view: (this.allViews())[vid]
@@ -1021,7 +1024,7 @@ var Pattern = (function () {
 		channels.internal.pending(lid, key, parameters);
 		channels.external.pending(lid, key, parameters);
 	};
-	ViewListManager.prototype.publish = function (lid, key, vid) { console.log("ViewListManager.prototype.publish()", lid, key, vid);
+	ViewListManager.prototype.publish = function (lid, key, vid) {
 		var parameters = {
 			viewList: (this.allViewLists())[lid],
 			view: (this.allViews())[vid]
@@ -1102,9 +1105,10 @@ var Pattern = (function () {
 					if (viewList[i] === vid) return ;
 				} while (++i < j);
 			}
-			mid = viewManager.getPredicateValue(vid, "model");
 			viewList.push(vid);
-			viewList[mid] = vid;
+			if (mid = this.modelFor(vid)) {
+				viewList[mid] = vid;
+			}
 			this.publish(lid, "add", vid);
 		}
 	};
@@ -1127,9 +1131,10 @@ var Pattern = (function () {
 						m = viewList.length;
 						vid = view.vid();
 						if (n === m) {
-							mid = viewManager.getPredicateValue(vid, "model");
 							viewList.push(vid);
-							viewList[mid] = vid;
+							if (mid = this.modelFor(vid)) {
+								viewList[mid] = vid;
+							}
 							this.publish(lid, "add", vid);
 						} else {
 							do {
@@ -1138,9 +1143,10 @@ var Pattern = (function () {
 								}
 							} while (++n < m);
 							if (n === m) {
-								mid = viewManager.getPredicateValue(vid, "model");
 								viewList.push(vid);
-								viewList[mid] = vid;
+								if (mid = this.modelFor(vid)) {
+									viewList[mid] = vid;
+								}
 								this.publish(lid, "add", vid);
 							}
 						}
@@ -1162,9 +1168,10 @@ var Pattern = (function () {
 				vid = view.vid();
 				do {
 					if (viewList[i] === vid) {
-						mid = viewManager.getPredicateValue(vid, "model");
 						viewList.splice(i, 1);
-						delete viewList[mid];
+						if (mid = this.modelFor(vid)) {
+							delete viewList[mid];
+						}
 						this.publish(lid, "remove", vid);
 						break;
 					}
@@ -1193,9 +1200,10 @@ var Pattern = (function () {
 							vid = view.vid();
 							do {
 								if (viewList[n] === vid) {
-									mid = viewManager.getPredicateValue(vid, "model");
 									viewList.splice(n, 1);
-									delete viewList[mid];
+									if (mid = this.modelFor(vid)) {
+										delete viewList[mid];
+									}
 									this.publish(lid, "remove", vid);
 									break;
 								}
@@ -1244,7 +1252,7 @@ var Pattern = (function () {
 		return (uid) ? this.setPredicateValue(lid, "modelList", uid) :
 		(uid = this.getPredicateValue(lid, "modelList")) ? (this.allModelLists())[uid] : null;
 	};
-	ViewListManager.prototype.initialize = function (lid, uid, parameters) { //console.log(lid, uid, parameters);
+	ViewListManager.prototype.initialize = function (lid, uid, parameters) {
 		var viewList = this.viewListFor(lid),
 			modelList = this.modelListFor(uid), //modelList.all();
 			allModels = this.allModels(),
@@ -1266,9 +1274,6 @@ var Pattern = (function () {
 		if ("modelList" in parameters) channels.external.createSubscription(lid, uid, parameters.modelList);
 		channels.internal.createSubscription(lid, uid, {
 			add: function (event) { //context is "ViewList" not "ViewListManager"
-				/*
-					TODO: Refine mechanism for mapping from model to view in viewList
-				*/
 				var viewList = viewListManager.viewListFor(lid),
 					model = event.model,
 					mid = model.mid(),
@@ -1277,14 +1282,8 @@ var Pattern = (function () {
 				viewList.push(vid);
 				viewList[mid] = vid;
 				viewListManager.pending(lid, "add", vid);
-				/*
-					END TODO;
-				*/
 			},
 			remove: function (event) { //context is "ViewList" not "ViewListManager"
-				/*
-					TODO: Refine mechanism for mapping from model to view in viewList
-				*/
 				var viewList = viewListManager.viewListFor(lid),
 					model = event.model,
 					mid = model.mid(),
@@ -1299,9 +1298,6 @@ var Pattern = (function () {
 						break;
 					}
 				}
-				/*
-					END TODO;
-				*/
 			}
 		});
 	};
@@ -1546,7 +1542,7 @@ var Pattern = (function () {
 			};
 		}());
 
-		function initialize(model, parameters) { //console.log(model, parameters);
+		function initialize(model, parameters) {
 			var vid, mid;
 			this.vid = (function (vid) {
 				return function () {
@@ -1608,7 +1604,7 @@ var Pattern = (function () {
 			};
 		}());
 
-		function initialize(modelList, parameters) { //console.log(parameters);
+		function initialize(modelList, parameters) {
 			var lid, uid;
 			this.lid = (function (lid) {
 				return function () {
@@ -1735,7 +1731,7 @@ var Pattern = (function () {
 		}
 		*/
 	};
-	ControllerManager.prototype.subscribe = function (cid, lid, parameters) { //console.log(cid, lid, parameters);
+	ControllerManager.prototype.subscribe = function (cid, lid, parameters) {
 		var viewList,
 			i, j,
 			vid;
@@ -1768,7 +1764,7 @@ var Pattern = (function () {
 
 	Controller = (function () {
 
-		function Controller(viewList, parameters) { //console.log(viewList, parameters);
+		function Controller(viewList, parameters) {
 			var cid, lid;
 			this.cid = (function (cid) {
 				return function () {
