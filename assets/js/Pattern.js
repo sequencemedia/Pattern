@@ -3,8 +3,8 @@ var Pattern = (function () {
 	"use strict";
 
 	var pattern,
+		channels,
 		createUID,
-		eventManager,
 		modelManager,
 		modelStorage,
 		modelListManager,
@@ -97,19 +97,9 @@ var Pattern = (function () {
 						return mix(mix({}, (alpha || false).constructor === Object ? alpha : {}), (omega || false).constructor === Object ? omega : {});
 					};
 				}())
-			}
+			};
 		}())
 	};
-
-	function Map() { this.map = {}; };
-	Map.prototype.get = function (lid, mid) {
-		return (this.map[lid] || (this.map[lid] = {}))[mid] || null;
-	};
-	Map.prototype.set = function (lid, mid, vid) {
-		(this.map[lid] || (this.map[lid] = {}))[mid] = vid;
-	};
-
-	var map = new Map();
 
 	createUID = (function () {
 		var count = 1e9;
@@ -118,74 +108,82 @@ var Pattern = (function () {
 		};
 	}());
 
-	function EventManager() {
-		var subscriptions = {};
-		this.allSubscriptions = function () {
-			return subscriptions;
+	function Channels() {
+
+		var channels = this;
+
+		function Channel() {
+			var subscriptions = {},
+				pending = [];
+			this.allSubscriptions = function () {
+				return subscriptions;
+			};
+			this.allPending = function () {
+				return pending;
+			};
+		}
+		Channel.prototype.createSubscription = function (subscriber, publisher, handlers) {
+			var key, subscriptions, handler;
+			for (key in handlers) {
+				if (typeof (handler = handlers[key]) === "function") {
+					subscriptions = this.subscriptionsFor(publisher, key);
+					subscriptions[subscriber] = handler;
+				}
+			}
 		};
+		Channel.prototype.removeSubscription = function (subscriber, publisher) {
+			var key, keys = this.keysFor(publisher), subscriptions;
+			for (key in keys) {
+				subscriptions = keys[key];
+				delete subscriptions[subscriber];
+			}
+		};
+		Channel.prototype.keysFor = function (uid) {
+			var subscriptions = this.allSubscriptions();
+			return (subscriptions[uid] || (subscriptions[uid] = {}));
+		};
+		Channel.prototype.subscriptionsFor = function (uid, key) {
+			var keys = this.keysFor(uid);
+			return (keys[key] || (keys[key] = {}));
+		};
+		Channel.prototype.pending = function (uid, key, parameters) { //console.log("Channel.prototype.pending()", uid, key, parameters);
+			this.allPending().push({ uid: uid, key: key, parameters: parameters });
+		};
+		Channel.prototype.publish = function (uid, key, parameters) { //console.log("Channel.prototype.publish()", uid, key, parameters);
+			var subscriptions = this.subscriptionsFor(uid, key),
+				subscriber,
+				handler,
+				pending;
+			for (subscriber in subscriptions) {
+				handler = subscriptions[subscriber];
+				handler.call(channels.contextFor(subscriber), parameters);
+			}
+			if (pending = this.allPending().shift()) {
+				this.publish(pending.uid, pending.key, pending.parameters);
+			}
+		};
+
+		this.internal = new Channel();
+		this.external = new Channel();
+
 	}
-	EventManager.prototype.allModels = function () {
+	Channels.prototype.allModels = function () {
 		return modelStorage.allModels();
 	};
-	EventManager.prototype.allViews = function () {
+	Channels.prototype.allViews = function () {
 		return viewStorage.allViews();
 	};
-	EventManager.prototype.allModelLists = function () {
+	Channels.prototype.allModelLists = function () {
 		return modelListStorage.allModelLists();
 	};
-	EventManager.prototype.allViewLists = function () {
+	Channels.prototype.allViewLists = function () {
 		return viewListStorage.allViewLists();
 	};
-	EventManager.prototype.allControllers = function () {
+	Channels.prototype.allControllers = function () {
 		return controllerStorage.allControllers();
 	};
-	EventManager.prototype.contextFor = function (uid) {
+	Channels.prototype.contextFor = function (uid) {
 		return (this.allViews())[uid] || (this.allViewLists())[uid] || (this.allControllers())[uid];
-	};
-	/*
-	EventManager.prototype.on = function () { };
-	EventManager.prototype.onList = function () { };
-	EventManager.prototype.ante = function () { };
-	EventManager.prototype.anteList = function () { };
-	EventManager.prototype.post = function () { };
-	EventManager.prototype.postList = function () { };
-	*/
-	EventManager.prototype.publish = function (uid, key, parameters) { //console.log(uid, key, parameters);
-		var subscriptions = this.subscriptionsFor(uid, key),
-			i = 0,
-			j = subscriptions.length,
-			subscription,
-			context;
-		for (i, j; i < j; i = i + 1) {
-			subscription = subscriptions[i];
-			context = this.contextFor(subscription.cid);
-			subscription.handler.call(context, parameters);
-		}
-	};
-	EventManager.prototype.subscriptionsFor = function (uid, key) {
-		var subscriptions = this.allSubscriptions();
-		return (subscriptions[uid] || (subscriptions[uid] = {}))[key] || (subscriptions[uid][key] = []);
-	};
-	EventManager.prototype.subscribe = function (subscriber, publisher, parameters) { //console.log(subscriber, publisher, parameters);
-		/*
-			TODO: Subscription attach/detach -- subscribe/endSubscription
-		*/
-		var key, subscriptions, handler;
-		for (key in parameters) {
-			if (typeof (handler = parameters[key]) === "function") {
-				subscriptions = this.subscriptionsFor(publisher, key);
-				subscriptions.push({ cid: subscriber, handler: handler });
-			}
-		}
-	};
-	EventManager.prototype.unsubscribe = function (subscriber, publisher) { //console.log(subscriber, publisher);
-		/*
-			TODO: Subscription attach/detach -- subscribe/endSubscription
-		*/
-		var subscriptions = this.allSubscriptions()[publisher];
-		if (subscriptions) {
-
-		}
 	};
 
 	function ModelManager() {
@@ -291,12 +289,32 @@ var Pattern = (function () {
 		(this.changedValuesFor(mid))[key] = changed;
 		(this.currentValuesFor(mid))[key] = current;
 	};
-	ModelManager.prototype.report = function (mid, key, changed, current) {
-		eventManager.publish(mid, key, {
+	ModelManager.prototype.internal = {
+		publish: function (mid, key, changed, current) {
+			channels.internal.publish(mid, key, {
+				changed: changed,
+				current: current,
+				model: (modelStorage.allModels())[mid]
+			});
+		}
+	};
+	ModelManager.prototype.external = {
+		publish: function (mid, key, changed, current) {
+			channels.external.publish(mid, key, {
+				changed: changed,
+				current: current,
+				model: (modelStorage.allModels())[mid]
+			});
+		}
+	};
+	ModelManager.prototype.publish = function (mid, key, changed, current) {
+		var parameters = {
 			changed: changed,
 			current: current,
 			model: (this.allModels())[mid]
-		});
+		};
+		channels.internal.publish(mid, key, parameters);
+		channels.external.publish(mid, key, parameters);
 	};
 	ModelManager.prototype.manage = function (mid, model) {
 		(this.allModels())[mid] = model;
@@ -344,7 +362,7 @@ var Pattern = (function () {
 		if (!this.isCurrentValue(mid, KEY, value)) {
 			if (this.validate(mid, KEY, value)) {
 				this.updateCurrentValue(mid, KEY, currentValue = this.getCurrentValue(mid, KEY), value); /* change with internal key */
-				this.report(mid, key, currentValue, value); /* report with external key */
+				this.external.publish(mid, key, currentValue, value); /* publish with external key */
 			}
 		}
 	};
@@ -357,7 +375,7 @@ var Pattern = (function () {
 				if (!this.isCurrentValue(mid, KEY, value)) {
 					if (this.validate(mid, KEY, value)) {
 						this.updateCurrentValue(mid, KEY, currentValue = this.getCurrentValue(mid, KEY), value); /* change with internal key */
-						this.report(mid, key, currentValue, value); /* report with external key */
+						this.external.publish(mid, key, currentValue, value); /* publish with external key */
 					}
 				}
 			}
@@ -369,7 +387,7 @@ var Pattern = (function () {
 			if (!this.isCurrentValue(mid, key, value)) {
 				if (this.validate(mid, key, value)) {
 					this.updateCurrentValue(mid, key, currentValue = this.getCurrentValue(mid, key), value); /* change with external key */
-					this.report(mid, key, currentValue, value); /* change with external key */
+					this.external.publish(mid, key, currentValue, value); /* change with external key */
 				}
 			}
 		}
@@ -379,7 +397,7 @@ var Pattern = (function () {
 			value = this.getChangedValue(mid, KEY), currentValue;
 		if (!this.isCurrentValue(mid, KEY, value)) {
 			this.updateCurrentValue(mid, KEY, currentValue = this.getCurrentValue(mid, KEY), value); /* change with internal key */
-			this.report(mid, key, currentValue, value); /* report with external key */
+			this.external.publish(mid, key, currentValue, value); /* publish with external key */
 		}
 	};
 	ModelManager.prototype.zedEach = function (mid, keys) {
@@ -392,7 +410,7 @@ var Pattern = (function () {
 					value = changedValues[KEY];
 					if (!this.isCurrentValue(mid, KEY, value)) {
 						this.updateCurrentValue(mid, KEY, currentValue = this.getCurrentValue(mid, KEY), value); /* change with internal key */
-						this.report(mid, key, currentValue, value); /* report with external key */
+						this.external.publish(mid, key, currentValue, value); /* publish with external key */
 					}
 				}
 			}
@@ -404,7 +422,7 @@ var Pattern = (function () {
 			value = changedValues[key]; //implicitly is changed
 			if (!this.isCurrentValue(mid, key, value)) {
 				this.updateCurrentValue(mid, key, currentValue = this.getCurrentValue(mid, key), value); /* change with external key */
-				this.report(mid, key, currentValue, value); /* report with external key */
+				this.external.publish(mid, key, currentValue, value); /* publish with external key */
 			}
 		}
 	};
@@ -414,7 +432,7 @@ var Pattern = (function () {
 		if (KEY in currentValues) {
 			value = currentValues[KEY];
 			this.removeCurrentValue(mid, KEY, value); /* delete with internal key */
-			this.report(mid, key, value); /* report with external key */
+			this.external.publish(mid, key, value); /* publish with external key */
 		}
 	};
 	ModelManager.prototype.unsetEach = function (mid, keys) {
@@ -426,7 +444,7 @@ var Pattern = (function () {
 				if (KEY in currentValues) { //can't zed unknown keys
 					value = currentValues[KEY];
 					this.removeCurrentValue(mid, KEY, value); /* delete with internal key */
-					this.report(mid, key, value); /* report with external key */
+					this.external.publish(mid, key, value); /* publish with external key */
 				}
 			}
 		}
@@ -436,7 +454,7 @@ var Pattern = (function () {
 		for (key in currentValues) {
 			value = currentValues[key];
 			this.removeCurrentValue(mid, key, value);
-			this.report(mid, key, value);
+			this.external.publish(mid, key, value);
 		}
 	};
 	ModelManager.prototype.reset = function (mid, key) {
@@ -445,11 +463,11 @@ var Pattern = (function () {
 		value = currentValues[KEY];
 		if (!this.isDefaultKey(mid, KEY)) { //unset
 			this.removeCurrentValue(mid, KEY, value); /* delete with internal key */
-			this.report(mid, key, value); /* report with external key */
+			this.external.publish(mid, key, value); /* publish with external key */
 		} else {
 			if (!this.isDefaultValue(mid, KEY, value)) { //reset
 				this.updateCurrentValue(mid, KEY, value, defaultValue = this.getDefaultValue(mid, KEY)); /* change with internal key */
-				this.report(mid, key, value, defaultValue); /* report with external key */
+				this.external.publish(mid, key, value, defaultValue); /* publish with external key */
 			}
 		}
 	};
@@ -462,11 +480,11 @@ var Pattern = (function () {
 				value = currentValues[KEY];
 				if (!this.isDefaultKey(mid, KEY)) { //unset
 					this.removeCurrentValue(mid, KEY, value); /* delete with internal key */
-					this.report(mid, key, value); /* report with external key */
+					this.external.publish(mid, key, value); /* publish with external key */
 				} else {
 					if (!this.isDefaultValue(mid, KEY, value)) { //reset
 						this.updateCurrentValue(mid, KEY, value, defaultValue = this.getDefaultValue(mid, KEY)); /* change with internal key */
-						this.report(mid, key, value, defaultValue); /* report with external key */
+						this.external.publish(mid, key, value, defaultValue); /* publish with external key */
 					}
 				}
 			}
@@ -479,11 +497,11 @@ var Pattern = (function () {
 			value = currentValues[KEY];
 			if (!this.isDefaultKey(mid, KEY)) { //unset
 				this.removeCurrentValue(mid, KEY, value); /* delete with internal key */
-				this.report(mid, key, value); /* report with external key */
+				this.external.publish(mid, key, value); /* publish with external key */
 			} else {
 				if (!this.isDefaultValue(mid, KEY, value)) { //reset
 					this.updateCurrentValue(mid, KEY, value, defaultValue = this.getDefaultValue(mid, KEY)); /* change with internal key */
-					this.report(mid, key, value, defaultValue); /* report with external key */
+					this.external.publish(mid, key, value, defaultValue); /* publish with external key */
 				}
 			}
 		}
@@ -558,11 +576,49 @@ var Pattern = (function () {
 		var attributes = this.allAttributes();
 		return (attributes[lid] || (attributes[lid] = []));
 	};
-	ModelListManager.prototype.report = function (lid, key, mid) {
-		eventManager.publish(lid, key, {
+	ModelListManager.prototype.internal = {
+		pending: function (lid, key, mid) {
+			channels.internal.publish(lid, key, {
+				modelList: (modelListStorage.allModelLists())[lid],
+				model: (modelStorage.allModels())[mid]
+			});
+		},
+		publish: function (lid, key, mid) {
+			channels.internal.publish(lid, key, {
+				modelList: (modelListStorage.allModelLists())[lid],
+				model: (modelStorage.allModels())[mid]
+			});
+		}
+	};
+	ModelListManager.prototype.external = {
+		pending: function (lid, key, mid) {
+			channels.external.pending(lid, key, {
+				modelList: (modelListStorage.allModelLists())[lid],
+				model: (modelStorage.allModels())[mid]
+			});
+		},
+		publish: function (lid, key, mid) {
+			channels.external.publish(lid, key, {
+				modelList: (modelListStorage.allModelLists())[lid],
+				model: (modelStorage.allModels())[mid]
+			});
+		}
+	};
+	ModelListManager.prototype.pending = function (lid, key, mid) { //console.log("ModelListManager.prototype.pending()", lid, key, mid);
+		var parameters = {
 			modelList: (this.allModelLists())[lid],
 			model: (this.allModels())[mid]
-		});
+		};
+		channels.internal.pending(lid, key, parameters);
+		channels.external.pending(lid, key, parameters);
+	};
+	ModelListManager.prototype.publish = function (lid, key, mid) { //console.log("ModelListManager.prototype.publish()", lid, key, mid);
+		var parameters = {
+			modelList: (this.allModelLists())[lid],
+			model: (this.allModels())[mid]
+		};
+		channels.internal.publish(lid, key, parameters);
+		channels.external.publish(lid, key, parameters);
 	};
 	ModelListManager.prototype.manage = function (lid, modelList) {
 		(this.allModelLists())[lid] = modelList;
@@ -618,7 +674,7 @@ var Pattern = (function () {
 					}
 				} while (++i < j);
 				modelList.splice(index, 0, mid);
-				//this.report(lid, "set", mid);
+				//this.internal.publish(lid, "set", mid);
 			}
 		}
 	};
@@ -637,7 +693,7 @@ var Pattern = (function () {
 				} while (++i < j);
 			}
 			modelList.push(mid);
-			this.report(lid, "add", mid);
+			this.publish(lid, "add", mid);
 		}
 	};
 	ModelListManager.prototype.addEach = function (lid, array) {
@@ -659,6 +715,7 @@ var Pattern = (function () {
 						mid = model.mid();
 						if (n === m) {
 							modelList.push(mid);
+							this.publish(lid, "add", mid);
 						} else {
 							do {
 								if (modelList[n] === mid) {
@@ -667,7 +724,7 @@ var Pattern = (function () {
 							} while (++n < m);
 							if (n === m) {
 								modelList.push(mid);
-								this.report(lid, "add", mid);
+								this.publish(lid, "add", mid);
 							}
 						}
 					}
@@ -688,7 +745,7 @@ var Pattern = (function () {
 				do {
 					if (modelList[i] === mid) {
 						modelList.splice(i, 1);
-						this.report(lid, "remove", mid);
+						this.publish(lid, "remove", mid);
 						break;
 					}
 				} while (++i < j);
@@ -716,7 +773,7 @@ var Pattern = (function () {
 							do {
 								if (modelList[n] === mid) {
 									modelList.splice(n, 1);
-									this.report(lid, "remove", mid);
+									this.publish(lid, "remove", mid);
 									break;
 								}
 							} while (++n < m);
@@ -835,9 +892,26 @@ var Pattern = (function () {
 	ViewManager.prototype.setPredicateValue = function (vid, key, value) {
 		(this.predicatesFor(vid))[key] = value;
 	};
-	ViewManager.prototype.report = function (vid, key) {
-		eventManager.publish(vid, key, {
-			view: (this.allViews())[vid]
+	ViewManager.prototype.internal = {
+		publish: function (vid, key) {
+			channels.internal.publish(vid, key, {
+				view: (viewStorage.allViews())[vid],
+				channel: "internal"
+			});
+		}
+	};
+	ViewManager.prototype.external = {
+		publish: function (vid, key) {
+			channels.external.publish(vid, key, {
+				view: (viewStorage.allViews())[vid],
+				channel: "external"
+			});
+		}
+	};
+	ViewManager.prototype.publish = function (vid, key) {
+		channels.internal.publish(vid, key, {
+			view: (this.allViews())[vid],
+			channel: "view"
 		});
 	};
 	ViewManager.prototype.manage = function (vid, view) {
@@ -862,15 +936,7 @@ var Pattern = (function () {
 		//console.error("A Pattern View susbcribes but does not initialize (yet)");
 	};
 	ViewManager.prototype.subscribe = function (vid, mid, parameters) { //console.log(vid, mid, parameters);
-		eventManager.subscribe(vid, mid, {
-			id: function (event) {
-				eventManager.publish(vid, "id", {
-					view: this,
-					was: event
-				});
-			}
-		});
-		if ("model" in parameters) eventManager.subscribe(vid, mid, parameters.model);
+		if ("model" in parameters) channels.external.createSubscription(vid, mid, parameters.model);
 	};
 
 	function ViewStorage() {
@@ -919,11 +985,49 @@ var Pattern = (function () {
 		var attributes = this.allAttributes();
 		return (attributes[lid] || (attributes[lid] = []));
 	};
-	ViewListManager.prototype.report = function (lid, key, vid) {
-		eventManager.publish(lid, key, {
+	ViewListManager.prototype.internal = {
+		pending: function (lid, key, vid) {
+			channels.internal.pending(lid, key, {
+				viewList: (viewListStorage.allViewLists())[lid],
+				view: (viewStorage.allViews())[vid]
+			});
+		},
+		publish: function (lid, key, vid) {
+			channels.internal.publish(lid, key, {
+				viewList: (viewListStorage.allViewLists())[lid],
+				view: (viewStorage.allViews())[vid]
+			});
+		}
+	};
+	ViewListManager.prototype.external = {
+		pending: function (lid, key, vid) {
+			channels.external.pending(lid, key, {
+				viewList: (viewListStorage.allViewLists())[lid],
+				view: (viewStorage.allViews())[vid]
+			});
+		},
+		publish: function (lid, key, vid) {
+			channels.external.publish(lid, key, {
+				viewList: (viewListStorage.allViewLists())[lid],
+				view: (viewStorage.allViews())[vid]
+			});
+		}
+	};
+	ViewListManager.prototype.pending = function (lid, key, vid) { console.log("ViewListManager.prototype.pending()", lid, key, vid);
+		var parameters = {
 			viewList: (this.allViewLists())[lid],
 			view: (this.allViews())[vid]
-		});
+		};
+		channels.internal.pending(lid, key, parameters);
+		channels.external.pending(lid, key, parameters);
+	};
+	ViewListManager.prototype.publish = function (lid, key, vid) { console.log("ViewListManager.prototype.publish()", lid, key, vid);
+		var parameters = {
+			viewList: (this.allViewLists())[lid],
+			view: (this.allViews())[vid]
+		};
+		channels.internal.publish(lid, key, parameters);
+		channels.external.publish(lid, key, parameters);
 	};
 	ViewListManager.prototype.manage = function (lid, viewList) {
 		(this.allViewLists())[lid] = viewList;
@@ -979,7 +1083,7 @@ var Pattern = (function () {
 					}
 				} while (++i < j);
 				viewList.splice(index, 0, vid);
-				//this.report(lid, "set", vid);
+				//this.internal.publish(lid, "set", vid);
 			}
 		}
 	};
@@ -1001,7 +1105,7 @@ var Pattern = (function () {
 			mid = viewManager.getPredicateValue(vid, "model");
 			viewList.push(vid);
 			viewList[mid] = vid;
-			this.report(lid, "add", vid);
+			this.publish(lid, "add", vid);
 		}
 	};
 	ViewListManager.prototype.addEach = function (lid, array) {
@@ -1026,7 +1130,7 @@ var Pattern = (function () {
 							mid = viewManager.getPredicateValue(vid, "model");
 							viewList.push(vid);
 							viewList[mid] = vid;
-							this.report(lid, "add", vid);
+							this.publish(lid, "add", vid);
 						} else {
 							do {
 								if (viewList[n] === vid) {
@@ -1037,7 +1141,7 @@ var Pattern = (function () {
 								mid = viewManager.getPredicateValue(vid, "model");
 								viewList.push(vid);
 								viewList[mid] = vid;
-								this.report(lid, "add", vid);
+								this.publish(lid, "add", vid);
 							}
 						}
 					}
@@ -1061,7 +1165,7 @@ var Pattern = (function () {
 						mid = viewManager.getPredicateValue(vid, "model");
 						viewList.splice(i, 1);
 						delete viewList[mid];
-						this.report(lid, "remove", vid);
+						this.publish(lid, "remove", vid);
 						break;
 					}
 				} while (++i < j);
@@ -1073,7 +1177,7 @@ var Pattern = (function () {
 			viewList,
 			view,
 			vid,
-			n, m
+			n, m,
 			mid;
 		if ((array || false).constructor === Array) {
 			i = 0;
@@ -1092,7 +1196,7 @@ var Pattern = (function () {
 									mid = viewManager.getPredicateValue(vid, "model");
 									viewList.splice(n, 1);
 									delete viewList[mid];
-									this.report(lid, "remove", vid);
+									this.publish(lid, "remove", vid);
 									break;
 								}
 							} while (++n < m);
@@ -1159,7 +1263,8 @@ var Pattern = (function () {
 		}
 	};
 	ViewListManager.prototype.subscribe = function (lid, uid, parameters) {
-		eventManager.subscribe(lid, uid, {
+		if ("modelList" in parameters) channels.external.createSubscription(lid, uid, parameters.modelList);
+		channels.internal.createSubscription(lid, uid, {
 			add: function (event) { //context is "ViewList" not "ViewListManager"
 				/*
 					TODO: Refine mechanism for mapping from model to view in viewList
@@ -1171,15 +1276,10 @@ var Pattern = (function () {
 					vid = view.vid();
 				viewList.push(vid);
 				viewList[mid] = vid;
-				viewListManager.report(lid, "add", vid);
+				viewListManager.pending(lid, "add", vid);
 				/*
 					END TODO;
 				*/
-				eventManager.publish(lid, "add", {
-					viewList: this,
-					view: view,
-					was: event
-				});
 			},
 			remove: function (event) { //context is "ViewList" not "ViewListManager"
 				/*
@@ -1194,24 +1294,16 @@ var Pattern = (function () {
 				for (i, j; i < j; i = i + 1) {
 					if (viewList[i] === vid) {
 						viewList.splice(i, 1);
+						delete viewList[mid];
+						viewListManager.pending(lid, "remove", vid); /* channels.internal.removeSubscription(lid, vid); channels.external.removeSubscription(lid, vid); */
 						break;
 					}
 				}
-				delete viewList[mid];
-				viewListManager.report(lid, "remove", vid);
 				/*
 					END TODO;
 				*/
-				eventManager.publish(lid, "remove", {
-					viewList: this,
-					view: (viewListManager.allViews())[vid],
-					was: event
-				});
 			}
 		});
-		if ("modelList" in parameters) {
-			eventManager.subscribe(lid, uid, parameters.modelList);
-		}
 	};
 
 	function ViewListStorage() {
@@ -1644,48 +1736,27 @@ var Pattern = (function () {
 		*/
 	};
 	ControllerManager.prototype.subscribe = function (cid, lid, parameters) { //console.log(cid, lid, parameters);
-		var viewList = this.viewListFor(lid),
-			i, j, vid;
-		for (i = 0, j = viewList.length; i < j; i = i + 1) {
-			vid = viewList[i];
-			eventManager.subscribe(cid, vid, { //controller subscribing to integral view events
-				id: function (event) {
-					eventManager.publish(cid, "id", {
-						controller: this,
-						was: event
-					});
-				}
-			});
-		}
+		var viewList,
+			i, j,
+			vid;
 		if ("view" in parameters) { //controller subscribing to custom view events
-			for (i = 0, j = viewList.length; i < j; i = i + 1) {
+			viewList = this.viewListFor(lid);
+			i = 0;
+			j = viewList.length;
+			for (i, j; i < j; i = i + 1) {
 				vid = viewList[i];
-				eventManager.subscribe(cid, vid, parameters.view);
+				channels.external.createSubscription(cid, vid, parameters.view);
 			}
 		}
-		eventManager.subscribe(cid, lid, { //controller subscribing to integral viewList events
-			add: function (event) {
-				if ("view" in parameters) {
-					eventManager.subscribe(cid, vid, parameters.view); //attachSubscription
-				}
-				eventManager.publish(cid, "add", {
-					controller: this,
-					was: event
-				});
+		if ("viewList" in parameters) channels.external.createSubscription(cid, lid, parameters.viewList); //controller subscribing to custom view events
+		channels.internal.createSubscription(cid, lid, { //controller subscribing to internal viewList events
+			add: function () {
+				if ("view" in parameters) channels.external.createSubscription(cid, vid, parameters.view); //shouldn't the parameters be passed to the constructor?
 			},
-			remove: function (event) {
-				if ("view" in parameters) {
-					eventManager.unsubscribe(cid, vid, parameters.view); //detachSubscription
-				}
-				eventManager.publish(cid, "remove", {
-					controller: this,
-					was: event
-				});
+			remove: function () {
+				if ("view" in parameters) channels.external.removeSubscription(cid, vid, parameters.view); //as above -- also should/should not the controller stop listening to this view? */
 			}
 		});
-		if ("viewList" in parameters) {
-			eventManager.subscribe(cid, lid, parameters.viewList); //controller subscribing to custom view events
-		}
 	};
 
 	function ControllerStorage() {
@@ -1702,7 +1773,7 @@ var Pattern = (function () {
 			this.cid = (function (cid) {
 				return function () {
 					return cid;
-				}
+				};
 			}(cid = createCID(createUID())));
 			controllerManager.manage(cid, this);
 			if (viewList instanceof ViewList) {
@@ -1714,13 +1785,14 @@ var Pattern = (function () {
 		}
 		Controller.prototype.viewList = function (viewList) {
 			return controllerManager.viewList(this.cid(), viewList);
-		}
+		};
 
 		return Controller;
 
 	}());
 
-	eventManager = new EventManager();
+	channels = new Channels();
+
 	modelManager = new ModelManager();
 	modelStorage = new ModelStorage();
 	modelListManager = new ModelListManager();
