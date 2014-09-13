@@ -3,8 +3,8 @@ var Pattern = (function () {
 	"use strict";
 
 	var pattern,
-		channels,
 		createUID,
+		channels,
 		modelManager,
 		modelStorage,
 		modelListManager,
@@ -932,9 +932,6 @@ var Pattern = (function () {
 		return (mid) ? this.setPredicateValue(vid, "model", mid) :
 		(mid = this.getPredicateValue(vid, "model")) ? (this.allModels())[mid] : null;
 	};
-	ViewManager.prototype.initialize = function (vid, mid, parameters) {
-		//console.error("A Pattern View susbcribes but does not initialize (yet)");
-	};
 	ViewManager.prototype.subscribe = function (vid, mid, parameters) {
 		if ("model" in parameters) channels.external.createSubscription(vid, mid, parameters.model);
 	};
@@ -978,11 +975,11 @@ var Pattern = (function () {
 	ViewListManager.prototype.setPredicateValue = function (lid, key, value) {
 		(this.predicatesFor(lid))[key] = value;
 	};
-	ViewListManager.prototype.modelListFor = function (lid) { //lists of instances
-		return modelListManager.modelListFor(lid);
-	};
 	ViewListManager.prototype.modelFor = function (vid) {
 		return viewManager.getPredicateValue(vid, "model");
+	};
+	ViewListManager.prototype.modelListFor = function (lid) { //lists of instances
+		return modelListManager.modelListFor(lid);
 	};
 	ViewListManager.prototype.viewListFor = function (lid) { //lists of instances
 		var attributes = this.allAttributes();
@@ -1309,6 +1306,91 @@ var Pattern = (function () {
 		};
 	}
 
+	function ControllerManager() {
+
+		var predicates = {},
+			attributes = {};
+		this.allPredicates = function () {
+			return predicates;
+		};
+		this.allAttributes = function () {
+			return attributes;
+		};
+		this.allViews = function () {
+			return viewStorage.allViews();
+		};
+		this.allViewLists = function () {
+			return viewListStorage.allViewLists();
+		};
+		this.allControllers = function () {
+			return controllerStorage.allControllers();
+		};
+
+	}
+	ControllerManager.prototype.predicatesFor = function (cid) {
+		var predicates = this.allPredicates();
+		return (predicates[cid] || (predicates[cid] = {}));
+	};
+	ControllerManager.prototype.getPredicateValue = function (cid, key) {
+		return (this.predicatesFor(cid))[key];
+	};
+	ControllerManager.prototype.setPredicateValue = function (cid, key, value) {
+		(this.predicatesFor(cid))[key] = value;
+	};
+	ControllerManager.prototype.viewListFor = function (lid) { //lists of instances
+		return viewListManager.viewListFor(lid);
+	};
+	ControllerManager.prototype.viewList = function (cid, viewList) {
+		var uid = (viewList instanceof ViewList) ? viewList.lid() : null;
+		return (uid) ? this.setPredicateValue(cid, "viewList", uid) :
+		(uid = this.getPredicateValue(cid, "viewList")) ? (this.allViewLists())[uid] : null;
+	};
+	ControllerManager.prototype.manage = function (cid, controller) {
+		(this.allControllers())[cid] = controller;
+	};
+	ControllerManager.prototype.forget = function (cid) {
+		delete (this.allControllers())[cid];
+	};
+	ControllerManager.prototype.subscribe = function (cid, lid, parameters) {
+		var viewList,
+			i, j,
+			vid;
+		if ("view" in parameters) { //controller creating subscription to custom view events
+			viewList = this.viewListFor(lid);
+			i = 0;
+			j = viewList.length;
+			for (i, j; i < j; i = i + 1) {
+				vid = viewList[i];
+				channels.external.createSubscription(cid, vid, parameters.view);
+			}
+			channels.internal.createSubscription(cid, lid, { //controller creating subscription to custom view events (views added to viewList)
+				add: function (event) {
+					var view = event.view,
+						vid = view.vid();
+					channels.external.createSubscription(cid, vid, parameters.view);
+				},
+				remove: function (event) { //controller removing subscription from custom view events (views added to viewList)
+					var view = event.view,
+						vid = view.vid();
+					channels.external.removeSubscription(cid, vid, parameters.view);
+				}
+			});
+		}
+		if ("viewList" in parameters) channels.external.createSubscription(cid, lid, parameters.viewList); //controller creating subscription to custom viewList events
+	};
+	ControllerManager.prototype.ancestor = function (cid, controller) {
+		var uid = (controller instanceof Controller) ? controller.cid() : null;
+		return (uid) ? this.setPredicateValue(cid, "ancestor", uid) :
+		(uid = this.getPredicateValue(cid, "ancestor")) ? (this.allControllers())[uid] : null;
+	};
+
+	function ControllerStorage() {
+		var controllers = {};
+		this.allControllers = function () {
+			return controllers;
+		};
+	}
+
 	Model = (function () {
 
 		var descendant = (function () {
@@ -1319,11 +1401,8 @@ var Pattern = (function () {
 				modelManager.inherit(ancestor.mid(), mid);
 			}
 			return function (pairs, idKey) {
-
 				return (function (ancestor, ancestorPairs, ancestorIdKey) {
-
 					var prototype = new ancestor.constructor();
-
 					function Model(pairs, idKey) { //merge the pairs object
 						initialize.call(this, ancestor, pattern.hash.mix(ancestorPairs, pairs), idKey || ancestorIdKey);
 					}
@@ -1331,13 +1410,9 @@ var Pattern = (function () {
 					Model.prototype.ancestor = function () {
 						return modelManager.ancestor(this.mid());
 					};
-
 					modelManager.forget(prototype.mid());
-
 					return pattern.inherit(ancestor.constructor, Model);
-
 				}(this instanceof Model ? this : new this(pairs, idKey), pairs, idKey));
-
 			};
 		}());
 
@@ -1456,11 +1531,8 @@ var Pattern = (function () {
 				modelListManager.inherit(ancestor.lid(), lid);
 			}
 			return function (pairsList, idKey) {
-
 				return (function (ancestor, ancestorPairsList, ancestorIdKey) {
-
 					var prototype = new ancestor.constructor();
-
 					function ModelList(pairsList, idKey) { //merge the ancestorPairsList array
 						initialize.call(this, ancestor, pattern.list.mix(ancestorPairsList, pairsList), idKey || ancestorIdKey);
 					}
@@ -1468,13 +1540,9 @@ var Pattern = (function () {
 					ModelList.prototype.ancestor = function () {
 						return modelListManager.ancestor(this.lid());
 					};
-
 					modelListManager.forget(prototype.lid());
-
 					return pattern.inherit(ancestor.constructor, ModelList);
-
 				}(this, pairsList, idKey));
-
 			};
 		}());
 
@@ -1486,11 +1554,8 @@ var Pattern = (function () {
 				modelListManager.inherit(ancestor.lid(), lid);
 			}
 			return function (pairsList, idKey) {
-
 				return (function (ancestor, ancestorIdKey) { //inherits ancestor models with modelListManager.inherit()
-
 					var prototype = new ancestor.constructor();
-
 					function ModelList(pairsList, idKey) {
 						initialize.call(this, ancestor, pairsList, idKey || ancestorIdKey);
 					}
@@ -1498,13 +1563,9 @@ var Pattern = (function () {
 					ModelList.prototype.ancestor = function () {
 						return modelListManager.ancestor(this.lid());
 					};
-
 					modelListManager.forget(prototype.lid());
-
 					return pattern.inherit(ancestor.constructor, ModelList);
-
 				}(new this(pairsList, idKey), idKey));
-
 			};
 		}());
 
@@ -1552,11 +1613,7 @@ var Pattern = (function () {
 			viewManager.manage(vid, this);
 			if (model instanceof Model) {
 				viewManager.model(vid, model);
-				viewManager.initialize(vid, mid = model.mid(), parameters || (parameters = {}));
-				//viewManager.subscribe(vid, mid, parameters);
-				//viewManager.initialize(vid, mid = model.mid(), parameters || (parameters = {}));
 				viewManager.subscribe(vid, model.mid(), parameters || (parameters = {}));
-
 			}
 		}
 
@@ -1657,112 +1714,28 @@ var Pattern = (function () {
 
 	}());
 
-	function ControllerManager() {
-
-		var predicates = {},
-			attributes = {};
-		this.allPredicates = function () {
-			return predicates;
-		};
-		this.allAttributes = function () {
-			return attributes;
-		};
-		this.allViews = function () {
-			return viewStorage.allViews();
-		};
-		this.allViewLists = function () {
-			return viewListStorage.allViewLists();
-		};
-		this.allControllers = function () {
-			return controllerStorage.allControllers();
-		};
-
-	}
-	ControllerManager.prototype.predicatesFor = function (cid) {
-		var predicates = this.allPredicates();
-		return (predicates[cid] || (predicates[cid] = {}));
-	};
-	ControllerManager.prototype.getPredicateValue = function (cid, key) {
-		return (this.predicatesFor(cid))[key];
-	};
-	ControllerManager.prototype.setPredicateValue = function (cid, key, value) {
-		(this.predicatesFor(cid))[key] = value;
-	};
-	ControllerManager.prototype.viewListFor = function (lid) { //lists of instances
-		return viewListManager.viewListFor(lid);
-	};
-	ControllerManager.prototype.viewList = function (cid, viewList) {
-		var uid = (viewList instanceof ViewList) ? viewList.lid() : null;
-		return (uid) ? this.setPredicateValue(cid, "viewList", uid) :
-		(uid = this.getPredicateValue(cid, "viewList")) ? (this.allViewLists())[uid] : null;
-	};
-	ControllerManager.prototype.manage = function (cid, controller) {
-		(this.allControllers())[cid] = controller;
-	};
-	ControllerManager.prototype.forget = function (cid) {
-		delete (this.allControllers())[cid];
-	};
-	ControllerManager.prototype.initialize = function (cid, lid, parameters) {
-		/*
-		var viewList,
-			allViews,
-			i, j,
-			vid,
-			view,
-			model,
-			mid,
-			lid;
-		*/
-		//console.error("A Pattern Controller subscribes but does not initialize.");
-		/*
-		if ("view" in parameters) {
-			viewList = this.viewListFor(lid);
-			allViews = this.allViews();
-			for (i = 0, j = viewList.length; i < j; i = i + 1) {
-				vid = viewList[i];
-				view = allViews[vid];
-				model = view.model();
-				mid = model.mid();
-				eventManager.subscribe(vid, mid, parameters.view);
-			}
-		}
-		if ("viewList" in parameters) {
-			eventManager.subscribe(lid, uid, parameters.viewList);
-		}
-		*/
-	};
-	ControllerManager.prototype.subscribe = function (cid, lid, parameters) {
-		var viewList,
-			i, j,
-			vid;
-		if ("view" in parameters) { //controller subscribing to custom view events
-			viewList = this.viewListFor(lid);
-			i = 0;
-			j = viewList.length;
-			for (i, j; i < j; i = i + 1) {
-				vid = viewList[i];
-				channels.external.createSubscription(cid, vid, parameters.view);
-			}
-		}
-		if ("viewList" in parameters) channels.external.createSubscription(cid, lid, parameters.viewList); //controller subscribing to custom view events
-		channels.internal.createSubscription(cid, lid, { //controller subscribing to internal viewList events
-			add: function () {
-				if ("view" in parameters) channels.external.createSubscription(cid, vid, parameters.view); //shouldn't the parameters be passed to the constructor?
-			},
-			remove: function () {
-				if ("view" in parameters) channels.external.removeSubscription(cid, vid, parameters.view); //as above -- also should/should not the controller stop listening to this view? */
-			}
-		});
-	};
-
-	function ControllerStorage() {
-		var controllers = {};
-		this.allControllers = function () {
-			return controllers;
-		};
-	}
-
 	Controller = (function () {
+
+		var descendant = (function () {
+			function initialize(ancestor, viewList, parameters) {
+				ancestor.constructor.call(this, viewList, parameters);
+				controllerManager.ancestor(this.cid(), ancestor);
+			}
+			return function (viewList, parameters) {
+				return (function (ancestor, ancestorViewList, ancestorParameters) {
+					var prototype = new ancestor.constructor();
+					function Controller(viewList, parameters) {
+						initialize.call(this, ancestor, viewList || ancestorViewList || ancestor.viewList(), parameters || ancestorParameters);
+					}
+					Controller.prototype = prototype;
+					Controller.prototype.ancestor = function () {
+						return controllerManager.ancestor(this.vid());
+					};
+					controllerManager.forget(prototype.cid());
+					return pattern.inherit(ancestor.constructor, Controller);
+				}(this instanceof Controller ? this : new this(viewList, parameters), viewList, parameters));
+			};
+		}());
 
 		function Controller(viewList, parameters) {
 			var cid, lid;
@@ -1774,14 +1747,15 @@ var Pattern = (function () {
 			controllerManager.manage(cid, this);
 			if (viewList instanceof ViewList) {
 				controllerManager.viewList(cid, viewList);
-				//controllerManager.initialize(cid, lid = viewList.lid(), parameters || (parameters = {}));
-				//controllerManager.subscribe(cid, lid, parameters);
 				controllerManager.subscribe(cid, viewList.lid(), parameters || (parameters = {}));
 			}
 		}
 		Controller.prototype.viewList = function (viewList) {
 			return controllerManager.viewList(this.cid(), viewList);
 		};
+		Controller.prototype.descendant = descendant;
+
+		Controller.descendant = descendant;
 
 		return Controller;
 
