@@ -1393,29 +1393,6 @@ var Pattern = (function () {
 
 	Model = (function () {
 
-		var descendant = (function () {
-			function initialize(ancestor, pairs, idKey) {
-				var mid;
-				ancestor.constructor.call(this, pairs, idKey);
-				modelManager.ancestor(mid = this.mid(), ancestor);
-				modelManager.inherit(ancestor.mid(), mid);
-			}
-			return function (pairs, idKey) {
-				return (function (ancestor, ancestorPairs, ancestorIdKey) {
-					var prototype = new ancestor.constructor();
-					function Model(pairs, idKey) { //merge the pairs object
-						initialize.call(this, ancestor, pattern.hash.mix(ancestorPairs, pairs), idKey || ancestorIdKey);
-					}
-					Model.prototype = prototype;
-					Model.prototype.ancestor = function () {
-						return modelManager.ancestor(this.mid());
-					};
-					modelManager.forget(prototype.mid());
-					return pattern.inherit(ancestor.constructor, Model);
-				}(this instanceof Model ? this : new this(pairs, idKey), pairs, idKey));
-			};
-		}());
-
 		function initialize(pairs, idKey) {
 			var mid;
 			this.mid = (function (mid) {
@@ -1475,9 +1452,56 @@ var Pattern = (function () {
 		Model.prototype.resetAll = function () {
 			modelManager.resetAll(this.mid());
 		};
-		Model.prototype.descendant = descendant;
-
-		Model.descendant = descendant;
+		Model.prototype.descendant = (function (Parent) {
+			function initialize(ancestor, pairs, idKey) {
+				var mid;
+				this.constructor.call(this, pairs, idKey); //ancestor.constructor.call(this, pairs, idKey);
+				modelManager.ancestor(mid = this.mid(), ancestor);
+				modelManager.inherit(ancestor.mid(), mid);
+			}
+			function child(Parent, parent, parentPairs, parentIdKey) {
+				var surrogate = new Parent;
+				function Model(pairs, idKey) {
+					initialize.call(this, parent, pattern.hash.mix(parentPairs, pairs), idKey || parentIdKey);
+				}
+				Model.prototype = surrogate;
+				Model.prototype.ancestor = function () {
+					return modelManager.ancestor(this.mid());
+				};
+				Model.prototype.descendant = (function (Parent) {
+					return function (pairs, idKey) {
+						return child.call(this, Parent, this, pattern.hash.mix(parentPairs, pairs), idKey || parentIdKey);
+					}
+				}(Model));
+				modelManager.forget(surrogate.mid());
+				return pattern.inherit(Parent, Model);
+			}
+			return function (pairs, idKey) {
+				return child.call(this, Parent, this, pairs, idKey);
+			}
+		}(Model));
+		Model.descendant = (function (Parent) {
+			function initialize(pairs, idKey) {
+				this.constructor.call(this, pairs, idKey);
+			}
+			function child(Parent, parentPairs, parentIdKey) {
+				var surrogate = new Parent;
+				function Model(pairs, idKey) {
+					initialize.call(this, pattern.hash.mix(parentPairs, pairs), idKey || parentIdKey);
+				}
+				Model.prototype = surrogate;
+				Model.descendant = (function (Parent) {
+					return function (pairs, idKey) {
+						return child.call(this, Parent, pattern.hash.mix(parentPairs, pairs), idKey || parentIdKey);
+					}
+				}(Model));
+				modelManager.forget(surrogate.mid());
+				return pattern.inherit(Parent, Model);
+			}
+			return function (pairs, idKey) {
+				return child.call(this, Parent, pairs, idKey);
+			}
+		}(Model));
 
 		return Model;
 
@@ -1523,52 +1547,56 @@ var Pattern = (function () {
 		ModelList.prototype.indexOf = function (model) {
 			return modelListManager.indexOf(this.lid(), model);
 		};
-		ModelList.prototype.descendant = (function () {
+		ModelList.prototype.descendant = (function (Parent) {
 			function initialize(ancestor, pairsList, idKey) {
 				var lid;
-				ancestor.constructor.call(this, pairsList, idKey);
+				this.constructor.call(this, pairsList, idKey); //ancestor.constructor.call(this, pairsList, idKey);
 				modelListManager.ancestor(lid = this.lid(), ancestor);
 				modelListManager.inherit(ancestor.lid(), lid);
 			}
-			return function (pairsList, idKey) {
-				return (function (ancestor, ancestorPairsList, ancestorIdKey) {
-					var prototype = new ancestor.constructor();
-					function ModelList(pairsList, idKey) { //merge the ancestorPairsList array
-						initialize.call(this, ancestor, pattern.list.mix(ancestorPairsList, pairsList), idKey || ancestorIdKey);
+			function child(Parent, parent, parentPairs, parentIdKey) {
+				var surrogate = new Parent;
+				function ModelList(pairsList, idKey) {
+					initialize.call(this, parent, pattern.list.mix(parentPairs, pairsList), idKey || parentIdKey);
+				}
+				ModelList.prototype = surrogate;
+				ModelList.prototype.ancestor = function () {
+					return modelListManager.ancestor(this.lid());
+				};
+				ModelList.prototype.descendant = (function (Parent) {
+					return function (pairsList, idKey) {
+						return child.call(this, Parent, this, pattern.list.mix(parentPairs, pairsList), idKey || parentIdKey);
 					}
-					ModelList.prototype = ancestor;
-					ModelList.prototype.ancestor = function () {
-						return modelListManager.ancestor(this.lid());
-					};
-					modelListManager.forget(prototype.lid());
-					return pattern.inherit(ancestor.constructor, ModelList);
-				}(this, pairsList, idKey));
-			};
-		}());
-
-		ModelList.descendant = (function () {
-			function initialize(ancestor, pairsList, idKey) {
-				var lid;
-				ancestor.constructor.call(this, pairsList, idKey);
-				modelListManager.ancestor(lid = this.lid(), ancestor);
-				modelListManager.inherit(ancestor.lid(), lid);
+				}(ModelList));
+				modelListManager.forget(surrogate.lid());
+				return pattern.inherit(Parent, ModelList);
 			}
 			return function (pairsList, idKey) {
-				return (function (ancestor, ancestorIdKey) { //inherits ancestor models with modelListManager.inherit()
-					var prototype = new ancestor.constructor();
-					function ModelList(pairsList, idKey) {
-						initialize.call(this, ancestor, pairsList, idKey || ancestorIdKey);
+				return child.call(this, Parent, this, pairsList, idKey);
+			}
+		}(ModelList));
+		ModelList.descendant = (function (Parent) {
+			function initialize(pairsList, idKey) {
+				this.constructor.call(this, pairsList, idKey);
+			}
+			function child(Parent, parentPairs, parentIdKey) {
+				var surrogate = new Parent;
+				function ModelList(pairsList, idKey) {
+					initialize.call(this, pattern.list.mix(parentPairs, pairsList), idKey || parentIdKey);
+				}
+				ModelList.prototype = surrogate;
+				ModelList.descendant = (function (Parent, parentPairs, parentIdKey) {
+					return function (pairsList, idKey) {
+						return child.call(this, Parent, pattern.list.mix(parentPairs, pairsList), idKey || parentIdKey);
 					}
-					ModelList.prototype = ancestor;
-					ModelList.prototype.ancestor = function () {
-						return modelListManager.ancestor(this.lid());
-					};
-					modelListManager.forget(prototype.lid());
-					return pattern.inherit(ancestor.constructor, ModelList);
-				}(new this(pairsList, idKey), idKey));
-			};
-		}());
-
+				}(ModelList, parentPairs, parentIdKey));
+				modelListManager.forget(surrogate.lid());
+				return pattern.inherit(Parent, ModelList);
+			}
+			return function (pairsList, idKey) {
+				return child.call(this, Parent, pairsList, idKey);
+			}
+		}(ModelList));
 		return ModelList;
 
 	}());
@@ -1716,28 +1744,7 @@ var Pattern = (function () {
 
 	Controller = (function () {
 
-		var descendant = (function () {
-			function initialize(ancestor, viewList, parameters) {
-				ancestor.constructor.call(this, viewList, parameters);
-				controllerManager.ancestor(this.cid(), ancestor);
-			}
-			return function (viewList, parameters) {
-				return (function (ancestor, ancestorViewList, ancestorParameters) {
-					var prototype = new ancestor.constructor();
-					function Controller(viewList, parameters) {
-						initialize.call(this, ancestor, viewList || ancestorViewList || ancestor.viewList(), parameters || ancestorParameters);
-					}
-					Controller.prototype = prototype;
-					Controller.prototype.ancestor = function () {
-						return controllerManager.ancestor(this.vid());
-					};
-					controllerManager.forget(prototype.cid());
-					return pattern.inherit(ancestor.constructor, Controller);
-				}(this instanceof Controller ? this : new this(viewList, parameters), viewList, parameters));
-			};
-		}());
-
-		function Controller(viewList, parameters) {
+		function initialize(viewList, parameters) {
 			var cid, lid;
 			this.cid = (function (cid) {
 				return function () {
@@ -1750,13 +1757,62 @@ var Pattern = (function () {
 				controllerManager.subscribe(cid, viewList.lid(), parameters || (parameters = {}));
 			}
 		}
+
+		function Controller(viewList, parameters) {
+			initialize.call(this, viewList, parameters);
+		}
 		Controller.prototype.viewList = function (viewList) {
 			return controllerManager.viewList(this.cid(), viewList);
 		};
-		Controller.prototype.descendant = descendant;
-
-		Controller.descendant = descendant;
-
+		Controller.prototype.descendant = (function (Parent) {
+			function initialize(ancestor, viewList, parameters) {
+				var cid;
+				this.constructor.call(this, viewList, parameters); //ancestor.constructor.call(this, viewList, parameters);
+				controllerManager.ancestor(this.cid(), ancestor);
+			}
+			function child(Parent, parent, parentViewList, parentParameters) {
+				var surrogate = new Parent;
+				function Controller(viewList, parameters) {
+					initialize.call(this, parent, viewList || parentViewList || parent.viewList(), parameters || parentParameters);
+				}
+				Controller.prototype = surrogate;
+				Controller.prototype.ancestor = function () {
+					return controllerManager.ancestor(this.cid());
+				};
+				Controller.prototype.descendant = (function (Parent) {
+					return function (viewList, parameters) {
+						return child.call(this, Parent, this, viewList, parameters);
+					}
+				}(Controller));
+				controllerManager.forget(surrogate.cid());
+				return pattern.inherit(Parent, Controller);
+			}
+			return function (viewList, parameters) {
+				return child.call(this, Parent, this, viewList, parameters);
+			}
+		}(Controller));
+		Controller.descendant = (function (Parent) {
+			function initialize(viewList, parameters) {
+				this.constructor.call(this, viewList, parameters); //ancestor.constructor.call(this, viewList, parameters);
+			}
+			function child(Parent, parentViewList, parentParameters) {
+				var surrogate = new Parent;
+				function Controller(viewList, parameters) {
+					initialize.call(this, viewList || parentViewList, parameters || parentParameters);
+				}
+				Controller.prototype = surrogate;
+				Controller.prototype.descendant = (function (Parent) {
+					return function (viewList, parameters) {
+						return child.call(this, Parent, viewList, parameters);
+					}
+				}(Controller));
+				controllerManager.forget(surrogate.cid());
+				return pattern.inherit(Parent, Controller);
+			}
+			return function (viewList, parameters) {
+				return child.call(this, Parent, viewList, parameters);
+			}
+		}(Controller));
 		return Controller;
 
 	}());
