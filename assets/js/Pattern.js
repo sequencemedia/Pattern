@@ -1603,34 +1603,6 @@ var Pattern = (function () {
 
 	View = (function () {
 
-		var descendant = (function () {
-			function initialize(ancestor, model, parameters) {
-				ancestor.constructor.call(this, model, parameters);
-				viewManager.ancestor(this.vid(), ancestor);
-			}
-			return function (model, parameters) {
-
-				return (function (ancestor, ancestorModel, ancestorParameters) {
-
-					var prototype = new ancestor.constructor();
-
-					function View(model, parameters) {
-						initialize.call(this, ancestor, model || ancestorModel || ancestor.model(), parameters || ancestorParameters);
-					}
-					View.prototype = prototype;
-					View.prototype.ancestor = function () {
-						return viewManager.ancestor(this.vid());
-					};
-
-					viewManager.forget(prototype.vid());
-
-					return pattern.inherit(ancestor.constructor, View);
-
-				}(this instanceof View ? this : new this(model, parameters), model, parameters));
-
-			};
-		}());
-
 		function initialize(model, parameters) {
 			var vid, mid;
 			this.vid = (function (vid) {
@@ -1651,43 +1623,60 @@ var Pattern = (function () {
 		View.prototype.model = function () {
 			return viewManager.model(this.vid());
 		};
-		View.prototype.descendant = descendant;
-
-		View.descendant = descendant;
-
+		View.prototype.descendant = (function (Parent) {
+			function initialize(ancestor, model, parameters) {
+				var vid;
+				this.constructor.call(this, model, parameters); //ancestor.constructor.call(this, model, parameters);
+				viewManager.ancestor(this.vid(), ancestor);
+			}
+			function child(Parent, parent, parentModel, parentParameters) {
+				var surrogate = new Parent;
+				function View(model, parameters) {
+					initialize.call(this, parent, model || parentModel || parent.model(), parameters || parentParameters);
+				}
+				View.prototype = surrogate;
+				View.prototype.ancestor = function () {
+					return viewManager.ancestor(this.vid());
+				};
+				View.prototype.descendant = (function (Parent) {
+					return function (model, parameters) {
+						return child.call(this, Parent, this, model, parameters);
+					}
+				}(View));
+				viewManager.forget(surrogate.vid());
+				return pattern.inherit(Parent, View);
+			}
+			return function (model, parameters) {
+				return child.call(this, Parent, this, model, parameters);
+			}
+		}(View));
+		View.descendant = (function (Parent) {
+			function initialize(model, parameters) {
+				this.constructor.call(this, model, parameters); //ancestor.constructor.call(this, model, parameters);
+			}
+			function child(Parent, parentModel, parentParameters) {
+				var surrogate = new Parent;
+				function View(model, parameters) {
+					initialize.call(this, model || parentModel, parameters || parentParameters);
+				}
+				View.prototype = surrogate;
+				View.prototype.descendant = (function (Parent) {
+					return function (model, parameters) {
+						return child.call(this, Parent, model, parameters);
+					}
+				}(View));
+				viewManager.forget(surrogate.vid());
+				return pattern.inherit(Parent, View);
+			}
+			return function (model, parameters) {
+				return child.call(this, Parent, model, parameters);
+			}
+		}(View));
 		return View;
 
 	}());
 
 	ViewList = (function () {
-
-		var descendant = (function () {
-			function initialize(ancestor, modelList, parameters) {
-				ancestor.constructor.call(this, modelList, parameters);
-				viewListManager.ancestor(this.lid(), ancestor);
-			}
-			return function (modelList, parameters) {
-
-				return (function (ancestor, ancestorModelList, ancestorParameters) {
-
-					var prototype = new ancestor.constructor();
-
-					function ViewList(modelList, parameters) {
-						initialize.call(this, ancestor, modelList || ancestorModelList || ancestor.modelList(), parameters || ancestorParameters);
-					}
-					ViewList.prototype = prototype;
-					ViewList.prototype.ancestor = function () {
-						return viewListManager.ancestor(this.lid());
-					};
-
-					viewListManager.forget(prototype.lid());
-
-					return pattern.inherit(ancestor.constructor, ViewList);
-
-				}(this instanceof ViewList ? this : new this(modelList, parameters), modelList, parameters));
-
-			};
-		}());
 
 		function initialize(modelList, parameters) {
 			var lid, uid;
@@ -1734,10 +1723,55 @@ var Pattern = (function () {
 		ViewList.prototype.modelList = function () {
 			return viewListManager.modelList(this.lid());
 		};
-		ViewList.prototype.descendant = descendant;
-
-		ViewList.descendant = descendant;
-
+		ViewList.prototype.descendant = (function (Parent) {
+			function initialize(ancestor, modelList, parameters) {
+				var lid;
+				this.constructor.call(this, modelList, parameters); //ancestor.constructor.call(this, modelList, parameters);
+				viewListManager.ancestor(this.lid(), ancestor);
+			}
+			function child(Parent, parent, parentModelList, parentParameters) {
+				var surrogate = new Parent;
+				function ViewList(modelList, parameters) {
+					initialize.call(this, parent, modelList || parentModelList || parent.modelList(), parameters || parentParameters);
+				}
+				ViewList.prototype = surrogate;
+				ViewList.prototype.ancestor = function () {
+					return viewListManager.ancestor(this.lid());
+				};
+				ViewList.prototype.descendant = (function (Parent) {
+					return function (modelList, parameters) {
+						return child.call(this, Parent, this, modelList, parameters);
+					}
+				}(ViewList));
+				viewListManager.forget(surrogate.lid());
+				return pattern.inherit(Parent, ViewList);
+			}
+			return function (modelList, parameters) {
+				return child.call(this, Parent, this, modelList, parameters);
+			}
+		}(ViewList));
+		ViewList.descendant = (function (Parent) {
+			function initialize(modelList, parameters) {
+				this.constructor.call(this, modelList, parameters); //ancestor.constructor.call(this, modelList, parameters);
+			}
+			function child(Parent, parentModelList, parentParameters) {
+				var surrogate = new Parent;
+				function ViewList(modelList, parameters) {
+					initialize.call(this, modelList || parentModelList, parameters || parentParameters);
+				}
+				ViewList.prototype = surrogate;
+				ViewList.prototype.descendant = (function (Parent) {
+					return function (modelList, parameters) {
+						return child.call(this, Parent, modelList, parameters);
+					}
+				}(ViewList));
+				viewListManager.forget(surrogate.lid());
+				return pattern.inherit(Parent, ViewList);
+			}
+			return function (modelList, parameters) {
+				return child.call(this, Parent, modelList, parameters);
+			}
+		}(ViewList));
 		return ViewList;
 
 	}());
