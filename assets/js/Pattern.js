@@ -114,20 +114,20 @@ var Pattern = (function () {
 
 		function Channel() {
 			var subscriptions = {},
-				pending = [];
+				queued = [];
 			this.allSubscriptions = function () {
 				return subscriptions;
 			};
-			this.allPending = function () {
-				return pending;
+			this.allQueued = function () {
+				return queued;
 			};
 		}
-		Channel.prototype.createSubscription = function (subscriber, publisher, handlers) {
-			var key, subscriptions, handler;
-			for (key in handlers) {
-				if (typeof (handler = handlers[key]) === "function") {
+		Channel.prototype.createSubscription = function (subscriber, publisher, methods) {
+			var key, subscriptions, method;
+			for (key in methods) {
+				if (typeof (method = methods[key]) === "function") {
 					subscriptions = this.subscriptionsFor(publisher, key);
-					subscriptions[subscriber] = handler;
+					subscriptions[subscriber] = method;
 				}
 			}
 		};
@@ -146,20 +146,20 @@ var Pattern = (function () {
 			var keys = this.keysFor(uid);
 			return (keys[key] || (keys[key] = {}));
 		};
-		Channel.prototype.pending = function (uid, key, parameters) {
-			this.allPending().push({ uid: uid, key: key, parameters: parameters });
+		Channel.prototype.queue = function (uid, key, parameters) {
+			this.allQueued().push({ uid: uid, key: key, parameters: parameters });
 		};
-		Channel.prototype.publish = function (uid, key, parameters) {
+		Channel.prototype.raise = function (uid, key, parameters) {
 			var subscriptions = this.subscriptionsFor(uid, key),
 				subscriber,
-				handler,
-				pending;
+				method,
+				queued;
 			for (subscriber in subscriptions) {
-				handler = subscriptions[subscriber];
-				handler.call(channels.contextFor(subscriber), parameters);
+				method = subscriptions[subscriber];
+				method.call(channels.contextFor(subscriber), parameters);
 			}
-			if (pending = this.allPending().shift()) {
-				this.publish(pending.uid, pending.key, pending.parameters);
+			if (queued = this.allQueued().shift()) {
+				this.raise(queued.uid, queued.key, queued.parameters);
 			}
 		};
 
@@ -290,8 +290,8 @@ var Pattern = (function () {
 		(this.currentValuesFor(mid))[key] = current;
 	};
 	ModelManager.prototype.internal = {
-		publish: function (mid, key, changed, current) {
-			channels.internal.publish(mid, key, {
+		raise: function (mid, key, changed, current) {
+			channels.internal.raise(mid, key, {
 				changed: changed,
 				current: current,
 				model: (modelStorage.allModels())[mid]
@@ -299,22 +299,22 @@ var Pattern = (function () {
 		}
 	};
 	ModelManager.prototype.external = {
-		publish: function (mid, key, changed, current) {
-			channels.external.publish(mid, key, {
+		raise: function (mid, key, changed, current) {
+			channels.external.raise(mid, key, {
 				changed: changed,
 				current: current,
 				model: (modelStorage.allModels())[mid]
 			});
 		}
 	};
-	ModelManager.prototype.publish = function (mid, key, changed, current) {
+	ModelManager.prototype.raise = function (mid, key, changed, current) {
 		var parameters = {
 			changed: changed,
 			current: current,
 			model: (this.allModels())[mid]
 		};
-		channels.internal.publish(mid, key, parameters);
-		channels.external.publish(mid, key, parameters);
+		channels.internal.raise(mid, key, parameters);
+		channels.external.raise(mid, key, parameters);
 	};
 	ModelManager.prototype.manage = function (mid, model) {
 		(this.allModels())[mid] = model;
@@ -362,7 +362,7 @@ var Pattern = (function () {
 		if (!this.isCurrentValue(mid, KEY, value)) {
 			if (this.validate(mid, KEY, value)) {
 				this.updateCurrentValue(mid, KEY, currentValue = this.getCurrentValue(mid, KEY), value); /* change with internal key */
-				this.external.publish(mid, key, currentValue, value); /* publish with external key */
+				this.external.raise(mid, key, currentValue, value); /* raise with external key */
 			}
 		}
 	};
@@ -375,7 +375,7 @@ var Pattern = (function () {
 				if (!this.isCurrentValue(mid, KEY, value)) {
 					if (this.validate(mid, KEY, value)) {
 						this.updateCurrentValue(mid, KEY, currentValue = this.getCurrentValue(mid, KEY), value); /* change with internal key */
-						this.external.publish(mid, key, currentValue, value); /* publish with external key */
+						this.external.raise(mid, key, currentValue, value); /* raise with external key */
 					}
 				}
 			}
@@ -387,7 +387,7 @@ var Pattern = (function () {
 			if (!this.isCurrentValue(mid, key, value)) {
 				if (this.validate(mid, key, value)) {
 					this.updateCurrentValue(mid, key, currentValue = this.getCurrentValue(mid, key), value); /* change with external key */
-					this.external.publish(mid, key, currentValue, value); /* change with external key */
+					this.external.raise(mid, key, currentValue, value); /* change with external key */
 				}
 			}
 		}
@@ -397,7 +397,7 @@ var Pattern = (function () {
 			value = this.getChangedValue(mid, KEY), currentValue;
 		if (!this.isCurrentValue(mid, KEY, value)) {
 			this.updateCurrentValue(mid, KEY, currentValue = this.getCurrentValue(mid, KEY), value); /* change with internal key */
-			this.external.publish(mid, key, currentValue, value); /* publish with external key */
+			this.external.raise(mid, key, currentValue, value); /* raise with external key */
 		}
 	};
 	ModelManager.prototype.zedEach = function (mid, keys) {
@@ -410,7 +410,7 @@ var Pattern = (function () {
 					value = changedValues[KEY];
 					if (!this.isCurrentValue(mid, KEY, value)) {
 						this.updateCurrentValue(mid, KEY, currentValue = this.getCurrentValue(mid, KEY), value); /* change with internal key */
-						this.external.publish(mid, key, currentValue, value); /* publish with external key */
+						this.external.raise(mid, key, currentValue, value); /* raise with external key */
 					}
 				}
 			}
@@ -422,7 +422,7 @@ var Pattern = (function () {
 			value = changedValues[key]; //implicitly is changed
 			if (!this.isCurrentValue(mid, key, value)) {
 				this.updateCurrentValue(mid, key, currentValue = this.getCurrentValue(mid, key), value); /* change with external key */
-				this.external.publish(mid, key, currentValue, value); /* publish with external key */
+				this.external.raise(mid, key, currentValue, value); /* raise with external key */
 			}
 		}
 	};
@@ -432,7 +432,7 @@ var Pattern = (function () {
 		if (KEY in currentValues) {
 			value = currentValues[KEY];
 			this.removeCurrentValue(mid, KEY, value); /* delete with internal key */
-			this.external.publish(mid, key, value); /* publish with external key */
+			this.external.raise(mid, key, value); /* raise with external key */
 		}
 	};
 	ModelManager.prototype.unsetEach = function (mid, keys) {
@@ -444,7 +444,7 @@ var Pattern = (function () {
 				if (KEY in currentValues) { //can't zed unknown keys
 					value = currentValues[KEY];
 					this.removeCurrentValue(mid, KEY, value); /* delete with internal key */
-					this.external.publish(mid, key, value); /* publish with external key */
+					this.external.raise(mid, key, value); /* raise with external key */
 				}
 			}
 		}
@@ -454,7 +454,7 @@ var Pattern = (function () {
 		for (key in currentValues) {
 			value = currentValues[key];
 			this.removeCurrentValue(mid, key, value);
-			this.external.publish(mid, key, value);
+			this.external.raise(mid, key, value);
 		}
 	};
 	ModelManager.prototype.reset = function (mid, key) {
@@ -463,11 +463,11 @@ var Pattern = (function () {
 		value = currentValues[KEY];
 		if (!this.isDefaultKey(mid, KEY)) { //unset
 			this.removeCurrentValue(mid, KEY, value); /* delete with internal key */
-			this.external.publish(mid, key, value); /* publish with external key */
+			this.external.raise(mid, key, value); /* raise with external key */
 		} else {
 			if (!this.isDefaultValue(mid, KEY, value)) { //reset
 				this.updateCurrentValue(mid, KEY, value, defaultValue = this.getDefaultValue(mid, KEY)); /* change with internal key */
-				this.external.publish(mid, key, value, defaultValue); /* publish with external key */
+				this.external.raise(mid, key, value, defaultValue); /* raise with external key */
 			}
 		}
 	};
@@ -480,11 +480,11 @@ var Pattern = (function () {
 				value = currentValues[KEY];
 				if (!this.isDefaultKey(mid, KEY)) { //unset
 					this.removeCurrentValue(mid, KEY, value); /* delete with internal key */
-					this.external.publish(mid, key, value); /* publish with external key */
+					this.external.raise(mid, key, value); /* raise with external key */
 				} else {
 					if (!this.isDefaultValue(mid, KEY, value)) { //reset
 						this.updateCurrentValue(mid, KEY, value, defaultValue = this.getDefaultValue(mid, KEY)); /* change with internal key */
-						this.external.publish(mid, key, value, defaultValue); /* publish with external key */
+						this.external.raise(mid, key, value, defaultValue); /* raise with external key */
 					}
 				}
 			}
@@ -497,11 +497,11 @@ var Pattern = (function () {
 			value = currentValues[KEY];
 			if (!this.isDefaultKey(mid, KEY)) { //unset
 				this.removeCurrentValue(mid, KEY, value); /* delete with internal key */
-				this.external.publish(mid, key, value); /* publish with external key */
+				this.external.raise(mid, key, value); /* raise with external key */
 			} else {
 				if (!this.isDefaultValue(mid, KEY, value)) { //reset
 					this.updateCurrentValue(mid, KEY, value, defaultValue = this.getDefaultValue(mid, KEY)); /* change with internal key */
-					this.external.publish(mid, key, value, defaultValue); /* publish with external key */
+					this.external.raise(mid, key, value, defaultValue); /* raise with external key */
 				}
 			}
 		}
@@ -577,48 +577,48 @@ var Pattern = (function () {
 		return (attributes[lid] || (attributes[lid] = []));
 	};
 	ModelListManager.prototype.internal = {
-		pending: function (lid, key, mid) {
-			channels.internal.pending(lid, key, {
+		queue: function (lid, key, mid) {
+			channels.internal.queue(lid, key, {
 				modelList: (modelListStorage.allModelLists())[lid],
 				model: (modelStorage.allModels())[mid]
 			});
 		},
-		publish: function (lid, key, mid) {
-			channels.internal.publish(lid, key, {
+		raise: function (lid, key, mid) {
+			channels.internal.raise(lid, key, {
 				modelList: (modelListStorage.allModelLists())[lid],
 				model: (modelStorage.allModels())[mid]
 			});
 		}
 	};
 	ModelListManager.prototype.external = {
-		pending: function (lid, key, mid) {
-			channels.external.pending(lid, key, {
+		queue: function (lid, key, mid) {
+			channels.external.queue(lid, key, {
 				modelList: (modelListStorage.allModelLists())[lid],
 				model: (modelStorage.allModels())[mid]
 			});
 		},
-		publish: function (lid, key, mid) {
-			channels.external.publish(lid, key, {
+		raise: function (lid, key, mid) {
+			channels.external.raise(lid, key, {
 				modelList: (modelListStorage.allModelLists())[lid],
 				model: (modelStorage.allModels())[mid]
 			});
 		}
 	};
-	ModelListManager.prototype.pending = function (lid, key, mid) {
+	ModelListManager.prototype.queue = function (lid, key, mid) {
 		var parameters = {
 			modelList: (this.allModelLists())[lid],
 			model: (this.allModels())[mid]
 		};
-		channels.internal.pending(lid, key, parameters);
-		channels.external.pending(lid, key, parameters);
+		channels.internal.queue(lid, key, parameters);
+		channels.external.queue(lid, key, parameters);
 	};
-	ModelListManager.prototype.publish = function (lid, key, mid) {
+	ModelListManager.prototype.raise = function (lid, key, mid) {
 		var parameters = {
 			modelList: (this.allModelLists())[lid],
 			model: (this.allModels())[mid]
 		};
-		channels.internal.publish(lid, key, parameters);
-		channels.external.publish(lid, key, parameters);
+		channels.internal.raise(lid, key, parameters);
+		channels.external.raise(lid, key, parameters);
 	};
 	ModelListManager.prototype.manage = function (lid, modelList) {
 		(this.allModelLists())[lid] = modelList;
@@ -673,8 +673,7 @@ var Pattern = (function () {
 						break;
 					}
 				} while (++i < j);
-				modelList.splice(index, 0, mid);
-				//this.internal.publish(lid, "set", mid);
+				modelList.splice(index, 0, mid); //this.internal.raise(lid, "set", mid);
 			}
 		}
 	};
@@ -693,7 +692,7 @@ var Pattern = (function () {
 				} while (++i < j);
 			}
 			modelList.push(mid);
-			this.publish(lid, "add", mid);
+			this.raise(lid, "add", mid);
 		}
 	};
 	ModelListManager.prototype.addEach = function (lid, array) {
@@ -715,7 +714,7 @@ var Pattern = (function () {
 						mid = model.mid();
 						if (n === m) {
 							modelList.push(mid);
-							this.publish(lid, "add", mid);
+							this.raise(lid, "add", mid);
 						} else {
 							do {
 								if (modelList[n] === mid) {
@@ -724,7 +723,7 @@ var Pattern = (function () {
 							} while (++n < m);
 							if (n === m) {
 								modelList.push(mid);
-								this.publish(lid, "add", mid);
+								this.raise(lid, "add", mid);
 							}
 						}
 					}
@@ -745,7 +744,7 @@ var Pattern = (function () {
 				do {
 					if (modelList[i] === mid) {
 						modelList.splice(i, 1);
-						this.publish(lid, "remove", mid);
+						this.raise(lid, "remove", mid);
 						break;
 					}
 				} while (++i < j);
@@ -773,7 +772,7 @@ var Pattern = (function () {
 							do {
 								if (modelList[n] === mid) {
 									modelList.splice(n, 1);
-									this.publish(lid, "remove", mid);
+									this.raise(lid, "remove", mid);
 									break;
 								}
 							} while (++n < m);
@@ -837,13 +836,15 @@ var Pattern = (function () {
 		(uid = this.getPredicateValue(mid, "ancestor")) ? (this.allModelLists())[uid] : null;
 	};
 	ModelListManager.prototype.initialize = function (lid, pairsList, idKey) {
-		var pairs,
-			model,
-			mid,
+		var Model,
 			modelList,
 			allModels,
+			pairs,
+			model,
+			mid,
 			i, j;
 		if ((pairsList || false).constructor === Array) {
+			Model = this.ModelFor(lid);
 			modelList = this.modelListFor(lid);
 			allModels = this.allModels();
 			for (i = 0, j = pairsList.length; i < j; i = i + 1) {
@@ -853,6 +854,9 @@ var Pattern = (function () {
 				modelList.push(mid);
 			}
 		}
+	};
+	ModelListManager.prototype.ModelFor = function (lid) {
+		return ((this.allModelLists())[lid] || Pattern).Model;
 	};
 
 	function ModelListStorage() {
@@ -893,23 +897,23 @@ var Pattern = (function () {
 		(this.predicatesFor(vid))[key] = value;
 	};
 	ViewManager.prototype.internal = {
-		publish: function (vid, key) {
-			channels.internal.publish(vid, key, {
+		raise: function (vid, key) {
+			channels.internal.raise(vid, key, {
 				view: (viewStorage.allViews())[vid],
 				channel: "internal"
 			});
 		}
 	};
 	ViewManager.prototype.external = {
-		publish: function (vid, key) {
-			channels.external.publish(vid, key, {
+		raise: function (vid, key) {
+			channels.external.raise(vid, key, {
 				view: (viewStorage.allViews())[vid],
 				channel: "external"
 			});
 		}
 	};
-	ViewManager.prototype.publish = function (vid, key) {
-		channels.internal.publish(vid, key, {
+	ViewManager.prototype.raise = function (vid, key) {
+		channels.internal.raise(vid, key, {
 			view: (this.allViews())[vid],
 			channel: "view"
 		});
@@ -986,48 +990,48 @@ var Pattern = (function () {
 		return (attributes[lid] || (attributes[lid] = []));
 	};
 	ViewListManager.prototype.internal = {
-		pending: function (lid, key, vid) {
-			channels.internal.pending(lid, key, {
+		queue: function (lid, key, vid) {
+			channels.internal.queue(lid, key, {
 				viewList: (viewListStorage.allViewLists())[lid],
 				view: (viewStorage.allViews())[vid]
 			});
 		},
-		publish: function (lid, key, vid) {
-			channels.internal.publish(lid, key, {
+		raise: function (lid, key, vid) {
+			channels.internal.raise(lid, key, {
 				viewList: (viewListStorage.allViewLists())[lid],
 				view: (viewStorage.allViews())[vid]
 			});
 		}
 	};
 	ViewListManager.prototype.external = {
-		pending: function (lid, key, vid) {
-			channels.external.pending(lid, key, {
+		queue: function (lid, key, vid) {
+			channels.external.queue(lid, key, {
 				viewList: (viewListStorage.allViewLists())[lid],
 				view: (viewStorage.allViews())[vid]
 			});
 		},
-		publish: function (lid, key, vid) {
-			channels.external.publish(lid, key, {
+		raise: function (lid, key, vid) {
+			channels.external.raise(lid, key, {
 				viewList: (viewListStorage.allViewLists())[lid],
 				view: (viewStorage.allViews())[vid]
 			});
 		}
 	};
-	ViewListManager.prototype.pending = function (lid, key, vid) {
+	ViewListManager.prototype.queue = function (lid, key, vid) {
 		var parameters = {
 			viewList: (this.allViewLists())[lid],
 			view: (this.allViews())[vid]
 		};
-		channels.internal.pending(lid, key, parameters);
-		channels.external.pending(lid, key, parameters);
+		channels.internal.queue(lid, key, parameters);
+		channels.external.queue(lid, key, parameters);
 	};
-	ViewListManager.prototype.publish = function (lid, key, vid) {
+	ViewListManager.prototype.raise = function (lid, key, vid) {
 		var parameters = {
 			viewList: (this.allViewLists())[lid],
 			view: (this.allViews())[vid]
 		};
-		channels.internal.publish(lid, key, parameters);
-		channels.external.publish(lid, key, parameters);
+		channels.internal.raise(lid, key, parameters);
+		channels.external.raise(lid, key, parameters);
 	};
 	ViewListManager.prototype.manage = function (lid, viewList) {
 		(this.allViewLists())[lid] = viewList;
@@ -1082,8 +1086,7 @@ var Pattern = (function () {
 						break;
 					}
 				} while (++i < j);
-				viewList.splice(index, 0, vid);
-				//this.internal.publish(lid, "set", vid);
+				viewList.splice(index, 0, vid); //this.internal.raise(lid, "set", vid);
 			}
 		}
 	};
@@ -1106,7 +1109,7 @@ var Pattern = (function () {
 			if (mid = this.modelFor(vid)) {
 				viewList[mid] = vid;
 			}
-			this.publish(lid, "add", vid);
+			this.raise(lid, "add", vid);
 		}
 	};
 	ViewListManager.prototype.addEach = function (lid, array) {
@@ -1132,7 +1135,7 @@ var Pattern = (function () {
 							if (mid = this.modelFor(vid)) {
 								viewList[mid] = vid;
 							}
-							this.publish(lid, "add", vid);
+							this.raise(lid, "add", vid);
 						} else {
 							do {
 								if (viewList[n] === vid) {
@@ -1144,7 +1147,7 @@ var Pattern = (function () {
 								if (mid = this.modelFor(vid)) {
 									viewList[mid] = vid;
 								}
-								this.publish(lid, "add", vid);
+								this.raise(lid, "add", vid);
 							}
 						}
 					}
@@ -1169,7 +1172,7 @@ var Pattern = (function () {
 						if (mid = this.modelFor(vid)) {
 							delete viewList[mid];
 						}
-						this.publish(lid, "remove", vid);
+						this.raise(lid, "remove", vid);
 						break;
 					}
 				} while (++i < j);
@@ -1201,7 +1204,7 @@ var Pattern = (function () {
 									if (mid = this.modelFor(vid)) {
 										delete viewList[mid];
 									}
-									this.publish(lid, "remove", vid);
+									this.raise(lid, "remove", vid);
 									break;
 								}
 							} while (++n < m);
@@ -1256,6 +1259,7 @@ var Pattern = (function () {
 			i, j,
 			mid,
 			model,
+			View = this.ViewFor(lid),
 			view,
 			vid;
 		for (i = 0, j = modelList.length; i < j; i = i + 1) {
@@ -1274,11 +1278,12 @@ var Pattern = (function () {
 				var viewList = viewListManager.viewListFor(lid),
 					model = event.model,
 					mid = model.mid(),
+					View = this.ViewFor(lid),
 					view = new View(model, parameters.model),
 					vid = view.vid();
 				viewList.push(vid);
 				viewList[mid] = vid;
-				viewListManager.pending(lid, "add", vid);
+				viewListManager.queue(lid, "add", vid);
 			},
 			remove: function (event) { //context is "ViewList" not "ViewListManager"
 				var viewList = viewListManager.viewListFor(lid),
@@ -1291,12 +1296,15 @@ var Pattern = (function () {
 					if (viewList[i] === vid) {
 						viewList.splice(i, 1);
 						delete viewList[mid];
-						viewListManager.pending(lid, "remove", vid); /* channels.internal.removeSubscription(lid, vid); channels.external.removeSubscription(lid, vid); */
+						viewListManager.queue(lid, "remove", vid); /* channels.internal.removeSubscription(lid, vid); channels.external.removeSubscription(lid, vid); */
 						break;
 					}
 				}
 			}
 		});
+	};
+	ViewListManager.prototype.ViewFor = function (lid) {
+		return ((this.allViewLists())[lid] || Pattern).View;
 	};
 
 	function ViewListStorage() {
@@ -1547,6 +1555,7 @@ var Pattern = (function () {
 		ModelList.prototype.indexOf = function (model) {
 			return modelListManager.indexOf(this.lid(), model);
 		};
+		ModelList.prototype.Model = Model;
 		ModelList.prototype.descendant = (function (Parent) {
 			function initialize(ancestor, pairsList, idKey) {
 				var lid;
@@ -1723,6 +1732,7 @@ var Pattern = (function () {
 		ViewList.prototype.modelList = function () {
 			return viewListManager.modelList(this.lid());
 		};
+		ViewList.prototype.View = View;
 		ViewList.prototype.descendant = (function (Parent) {
 			function initialize(ancestor, modelList, parameters) {
 				var lid;
