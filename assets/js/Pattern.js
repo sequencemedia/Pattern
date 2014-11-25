@@ -1278,8 +1278,7 @@ var Pattern = (function () {
 				var viewList = viewListManager.viewListFor(lid),
 					model = event.model,
 					mid = model.mid(),
-					View = this.ViewFor(lid),
-					view = new View(model, parameters.model),
+					view = new this.View(model, parameters.model),
 					vid = view.vid();
 				viewList.push(vid);
 				viewList[mid] = vid;
