@@ -115,6 +115,70 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 		};
 	}());
 
+	/*
+		Can't implement a flat list without changing list ids to distinguish
+		between ModelList and ViewList instances (presently their ids are
+		non-unique but ids are never shared between classes)
+	*/
+	function Storage() {
+		var all = {};
+		this.all = function () {
+			return all;
+		};
+	}
+
+	function Manager() {
+		var attributes = {},
+			predicates = {};
+		this.allAttributes = function () {
+			return predicates;
+		};
+		this.allPredicates = function () {
+			return attributes;
+		};
+	}
+	Manager.prototype.allModels = function () {
+		return modelStorage.allModels();
+	};
+	Manager.prototype.allModelLists = function () {
+		return modelListStorage.allModelLists();
+	};
+	Manager.prototype.allViews = function () {
+		return viewStorage.allViews();
+	};
+	Manager.prototype.allViewLists = function () {
+		return viewListStorage.allViewLists();
+	};
+	Manager.prototype.allControllers = function () {
+		return controllerStorage.allControllers();
+	};
+	Manager.prototype.attributesFor = function (uid) {
+		var attributes = this.allAttributes();
+		return (attributes[uid] || (attributes[uid] = {}));
+	};
+	Manager.prototype.getAttributeValue = function (uid, key) {
+		return (this.attributesFor(uid))[key];
+	};
+	Manager.prototype.setAttributeValue = function (uid, key, value) {
+		(this.attributesFor(uid))[key] = value;
+	};
+	Manager.prototype.predicatesFor = function (uid) {
+		var predicates = this.allPredicates();
+		return (predicates[uid] || (predicates[uid] = {}));
+	};
+	Manager.prototype.getPredicateValue = function (uid, key) {
+		return (this.predicatesFor(uid))[key];
+	};
+	Manager.prototype.setPredicateValue = function (uid, key, value) {
+		(this.predicatesFor(uid))[key] = value;
+	};
+	Manager.prototype.modelListFor = function (lid) {
+		return modelListManager.modelListFor(lid);
+	}
+	Manager.prototype.viewListFor = function (lid) {
+		return viewListManager.viewListFor(lid);
+	};
+
 	function Channels() {
 		var channels = this;
 		function Channel() {
@@ -191,35 +255,17 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 		this.internal = new Channel();
 		this.external = new Channel();
 	}
-	Channels.prototype.allModels = function () {
-		return modelStorage.allModels();
-	};
-	Channels.prototype.allViews = function () {
-		return viewStorage.allViews();
-	};
-	Channels.prototype.allModelLists = function () {
-		return modelListStorage.allModelLists();
-	};
-	Channels.prototype.allViewLists = function () {
-		return viewListStorage.allViewLists();
-	};
-	Channels.prototype.allControllers = function () {
-		return controllerStorage.allControllers();
-	};
-	Channels.prototype.contextFor = function (uid) {
+	Channels.prototype = new Manager();
+	Channels.prototype.contextFor = function (uid) { //return (storage.all())[uid];
 		return (this.allViews())[uid] || (this.allViewLists())[uid] || (this.allControllers())[uid];
 	};
 
 	function ModelManager() {
-		var predicates = {},
-			defaultAttributes = {},
+		var defaultAttributes = {},
 			changedAttributes = {},
 			currentAttributes = {},
 			validators = {},
 			idKeys = {};
-		this.allPredicates = function () {
-			return predicates;
-		};
 		this.allDefaultAttributes = function () {
 			return defaultAttributes;
 		};
@@ -236,34 +282,7 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 			return idKeys;
 		};
 	}
-	ModelManager.prototype.allModels = function () {
-		return modelStorage.allModels();
-	};
-	ModelManager.prototype.allModelLists = function () {
-		return modelListStorage.allModelLists();
-	};
-	ModelManager.prototype.modelListFor = function (lid) {
-		return modelListManager.modelListFor(lid);
-	};
-	ModelManager.prototype.allViews = function () {
-		return viewStorage.allViews();
-	};
-	ModelManager.prototype.allViewLists = function () {
-		return viewListStorage.allViewLists();
-	};
-	ModelManager.prototype.viewListFor = function (lid) {
-		return viewListManager.viewListFor(lid);
-	};
-	ModelManager.prototype.predicatesFor = function (mid) {
-		var predicates = this.allPredicates();
-		return (predicates[mid] || (predicates[mid] = {}));
-	};
-	ModelManager.prototype.getPredicateValue = function (mid, key) {
-		return (this.predicatesFor(mid))[key];
-	};
-	ModelManager.prototype.setPredicateValue = function (mid, key, value) {
-		(this.predicatesFor(mid))[key] = value;
-	};
+	ModelManager.prototype = new Manager();
 	ModelManager.prototype.defaultValuesFor = function (mid) {
 		var defaultAttributes = this.allDefaultAttributes();
 		return (defaultAttributes[mid] || (defaultAttributes[mid] = {}));
@@ -590,37 +609,8 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 		};
 	}
 
-	function ModelListManagerException(message) {
-		this.name = "ModelListManagerException";
-		this.message = message;
-	}
-
-	function ModelListManager() {
-		var predicates = {},
-			attributes = {};
-		this.allPredicates = function () {
-			return predicates;
-		};
-		this.allAttributes = function () {
-			return attributes;
-		};
-	}
-	ModelListManager.prototype.allModels = function () {
-		return modelStorage.allModels();
-	};
-	ModelListManager.prototype.allModelLists = function () {
-		return modelListStorage.allModelLists();
-	};
-	ModelListManager.prototype.predicatesFor = function (lid) {
-		var predicates = this.allPredicates();
-		return (predicates[lid] || (predicates[lid] = {}));
-	};
-	ModelListManager.prototype.getPredicateValue = function (lid, key) {
-		return (this.predicatesFor(lid))[key];
-	};
-	ModelListManager.prototype.setPredicateValue = function (lid, key, value) {
-		(this.predicatesFor(lid))[key] = value;
-	};
+	function ModelListManager() {}
+	ModelListManager.prototype = new Manager();
 	ModelListManager.prototype.modelListFor = function (lid) {
 		var attributes = this.allAttributes();
 		return (attributes[lid] || (attributes[lid] = []));
@@ -645,10 +635,8 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 	};
 	ModelListManager.prototype.discard = function (lid) {
 		var modelList = this.modelListFor(lid),
-			allViewLists,
+			allViewLists = viewListManager.allViewLists(),
 			uid;
-		if (modelList.length !== 0) throw new ModelListManagerException("ModelList is not empty");
-		allViewLists = viewListManager.allViewLists();
 		for (uid in allViewLists) {
 			channels.internal.removeSubscription(uid, lid);
 			channels.external.removeSubscription(uid, lid);
@@ -907,53 +895,10 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 		};
 	}
 
-	function ViewManager() {
-		var predicates = {},
-			attributes = {};
-		this.allPredicates = function () {
-			return predicates;
-		};
-		this.allAttributes = function () {
-			return attributes;
-		};
-	}
-	ViewManager.prototype.allModels = function () {
-		return modelStorage.allModels();
-	};
-	ViewManager.prototype.modelFor = function (vid) {
-		return viewListManager.modelFor(vid);
-	};
-	ViewManager.prototype.allModelLists = function () {
-		return modelListStorage.allModelLists();
-	};
-	ViewManager.prototype.modelListFor = function (lid) {
-		return modelListManager.modelListFor(lid);
-	};
-	ViewManager.prototype.allViews = function () {
-		return viewStorage.allViews();
-	};
-	ViewManager.prototype.allViewLists = function () {
-		return viewListStorage.allViewLists();
-	};
-	ViewManager.prototype.viewListFor = function (lid) {
-		return viewListManager.viewListFor(lid);
-	};
-	ViewManager.prototype.allControllers = function () {
-		return controllerManager.allControllers();
-	};
-	ViewManager.prototype.predicatesFor = function (vid) {
-		var predicates = this.allPredicates();
-		return (predicates[vid] || (predicates[vid] = {}));
-	};
-	ViewManager.prototype.attributesFor = function (vid) {
-		var attributes = this.allAttributes();
-		return (attributes[vid] || (attributes[vid] = {}));
-	};
-	ViewManager.prototype.getPredicateValue = function (vid, key) {
-		return (this.predicatesFor(vid))[key];
-	};
-	ViewManager.prototype.setPredicateValue = function (vid, key, value) {
-		(this.predicatesFor(vid))[key] = value;
+	function ViewManager() {}
+	ViewManager.prototype = new Manager();
+	ViewManager.prototype.modelFor = function (vid) { //console.log(vid);
+		return this.getPredicateValue(vid, "model");
 	};
 	ViewManager.prototype.queue = function (vid, key, etc) {
 		channels.external.queue(vid, key, {
@@ -978,7 +923,7 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 			mid,
 			allControllers = this.allControllers(),
 			cid;
-		for (lid in allViewLists) {
+		for (lid in allViewLists) { //console.log(lid);
 			viewList = this.viewListFor(lid);
 			i = 0;
 			j = viewList.length;
@@ -998,7 +943,7 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 			channels.internal.removeSubscription(cid, vid);
 			channels.external.removeSubscription(cid, vid);
 		}
-		if (mid = this.getPredicateValue(vid, "model")) {
+		if (mid = this.modelFor(vid)) {
 			channels.internal.removeSubscription(vid, mid);
 			channels.external.removeSubscription(vid, mid);
 		}
@@ -1029,48 +974,10 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 		};
 	}
 
-	function ViewListManagerException(message) {
-		this.name = "ViewListManagerException";
-		this.message = message;
-	}
-
-	function ViewListManager() {
-		var predicates = {},
-			attributes = {};
-		this.allPredicates = function () {
-			return predicates;
-		};
-		this.allAttributes = function () {
-			return attributes;
-		};
-	}
-	ViewListManager.prototype.allModels = function () { //instances
-		return modelStorage.allModels();
-	};
-	ViewListManager.prototype.allViews = function () { //instances
-		return viewStorage.allViews();
-	};
-	ViewListManager.prototype.allModelLists = function () { //instances
-		return modelListStorage.allModelLists();
-	};
-	ViewListManager.prototype.allViewLists = function () { //instances
-		return viewListStorage.allViewLists();
-	};
-	ViewListManager.prototype.predicatesFor = function (lid) {
-		var predicates = this.allPredicates();
-		return (predicates[lid] || (predicates[lid] = {}));
-	};
-	ViewListManager.prototype.getPredicateValue = function (lid, key) {
-		return (this.predicatesFor(lid))[key];
-	};
-	ViewListManager.prototype.setPredicateValue = function (lid, key, value) {
-		(this.predicatesFor(lid))[key] = value;
-	};
+	function ViewListManager() {}
+	ViewListManager.prototype = new Manager();
 	ViewListManager.prototype.modelFor = function (vid) {
-		return viewManager.getPredicateValue(vid, "model");
-	};
-	ViewListManager.prototype.modelListFor = function (lid) { //lists of instances
-		return modelListManager.modelListFor(lid);
+		return viewManager.modelFor(vid);
 	};
 	ViewListManager.prototype.viewListFor = function (lid) { //lists of instances
 		var attributes = this.allAttributes();
@@ -1096,11 +1003,9 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 	};
 	ViewListManager.prototype.discard = function (lid) {
 		var viewList = this.viewListFor(lid),
-			allControllers,
+			allControllers = controllerManager.allControllers(),
 			cid,
 			uid;
-		if (viewList.length !== 0) throw new ViewListManagerException("ViewList is not empty");
-		allControllers = controllerManager.allControllers();
 		for (cid in allControllers) {
 			channels.internal.removeSubscription(cid, lid);
 			channels.external.removeSubscription(cid, lid);
@@ -1428,38 +1333,8 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 		};
 	}
 
-	function ControllerManager() {
-		var predicates = {},
-			attributes = {};
-		this.allPredicates = function () {
-			return predicates;
-		};
-		this.allAttributes = function () {
-			return attributes;
-		};
-		this.allViews = function () {
-			return viewStorage.allViews();
-		};
-		this.allViewLists = function () {
-			return viewListStorage.allViewLists();
-		};
-		this.allControllers = function () {
-			return controllerStorage.allControllers();
-		};
-	}
-	ControllerManager.prototype.predicatesFor = function (cid) {
-		var predicates = this.allPredicates();
-		return (predicates[cid] || (predicates[cid] = {}));
-	};
-	ControllerManager.prototype.getPredicateValue = function (cid, key) {
-		return (this.predicatesFor(cid))[key];
-	};
-	ControllerManager.prototype.setPredicateValue = function (cid, key, value) {
-		(this.predicatesFor(cid))[key] = value;
-	};
-	ControllerManager.prototype.viewListFor = function (lid) { //lists of instances
-		return viewListManager.viewListFor(lid);
-	};
+	function ControllerManager() {}
+	ControllerManager.prototype = new Manager();
 	ControllerManager.prototype.viewList = function (cid, viewList) {
 		var uid = (viewList instanceof ViewList) ? viewList.lid() : null;
 		return (uid) ? this.setPredicateValue(cid, "viewList", uid) :
@@ -2044,26 +1919,32 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 
 	channels = new Channels();
 
-	modelManager = new ModelManager();
 	modelStorage = new ModelStorage();
-	modelListManager = new ModelListManager();
 	modelListStorage = new ModelListStorage();
-	viewManager = new ViewManager();
 	viewStorage = new ViewStorage();
-	viewListManager = new ViewListManager();
 	viewListStorage = new ViewListStorage();
-	controllerManager = new ControllerManager();
 	controllerStorage = new ControllerStorage();
 
+	modelManager = new ModelManager();
+	modelListManager = new ModelListManager();
+	viewManager = new ViewManager();
+	viewListManager = new ViewListManager();
+	controllerManager = new ControllerManager();
 /*
 window.channels = channels;
+
 window.modelStorage = modelStorage;
 window.modelListStorage = modelListStorage;
 window.viewStorage = viewStorage;
 window.viewListStorage = viewListStorage;
 window.controllerStorage = controllerStorage;
-*/
 
+window.modelManager = modelManager;
+window.modelListManager = modelListManager;
+window.viewManager = viewManager;
+window.viewListManager = viewListManager;
+window.controllerManager = controllerManager;
+*/
 	return {
 
 		Model: Model,
