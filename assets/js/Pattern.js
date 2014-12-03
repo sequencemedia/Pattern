@@ -351,7 +351,7 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 	};
 	ModelManager.prototype.validate = function (mid, key, value) {
 		var validator = (this.validatorsFor(mid))[key];
-		return (validator || false).constructor === Function ? validator(key, value) : true;
+		return (validator || false).constructor === Function ? validator(value) : true;
 	};
 	ModelManager.prototype.removeCurrentValue = function (mid, key, changed) {
 		(this.changedValuesFor(mid))[key] = changed;
@@ -577,22 +577,35 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 		};
 	}());
 	ModelManager.prototype.ancestor = function (mid, model) {
-		var uid = (model) ? model.mid() : null;
+		var uid = (model instanceof Model) ? model.mid() : null;
 		return (uid) ? this.setPredicateValue(mid, "ancestor", uid) :
 		(uid = this.getPredicateValue(mid, "ancestor")) ? (this.allModels())[uid] : null;
 	};
-	ModelManager.prototype.initialize = function (mid, pairs, idKey) {
+	ModelManager.prototype.initialize = function (mid, pairs, idKey, parameters) {
 		var key, value,
-			defaultValues = this.defaultValuesFor(mid),
-			changedValues = this.changedValuesFor(mid),
+			defaultValues,
+			changedValues,
+			currentValues,
+			validators;
+		if ((pairs || false).constructor === Object) {
+			defaultValues = this.defaultValuesFor(mid);
+			changedValues = this.changedValuesFor(mid);
 			currentValues = this.currentValuesFor(mid);
-		for (key in pairs) {
-			value = pairs[key];
-			defaultValues[key] = value;
-			changedValues[key] = value;
-			currentValues[key] = value;
+			for (key in pairs) {
+				value = pairs[key];
+				defaultValues[key] = value;
+				changedValues[key] = value;
+				currentValues[key] = value;
+			}
 		}
 		if (idKey !== this.getIDKey(mid)) this.setIDKey(mid, idKey);
+		if ((parameters || false).constructor === Object) {
+			validators = this.validatorsFor(mid);
+			for (key in parameters) {
+				value = parameters[key];
+				validators[key] = value;
+			}
+		}
 	};
 
 	function ModelStorage() {
@@ -870,11 +883,11 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 		return -1;
 	};
 	ModelListManager.prototype.ancestor = function (mid, modelList) {
-		var uid = (modelList) ? modelList.lid() : null;
+		var uid = (modelList instanceof ModelList) ? modelList.lid() : null;
 		return (uid) ? this.setPredicateValue(mid, "ancestor", uid) :
 		(uid = this.getPredicateValue(mid, "ancestor")) ? (this.allModelLists())[uid] : null;
 	};
-	ModelListManager.prototype.initialize = function (lid, pairsList, idKey) {
+	ModelListManager.prototype.initialize = function (lid, pairsList, idKey, parameters) { //console.log(lid, pairsList, idKey, parameters);
 		var Model,
 			modelList,
 			allModels,
@@ -888,7 +901,7 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 			allModels = this.allModels();
 			for (i = 0, j = pairsList.length; i < j; i = i + 1) {
 				pairs = pairsList[i];
-				model = new Model(pairs, idKey);
+				model = new Model(pairs, idKey, parameters);
 				mid = model.mid();
 				modelList.push(mid);
 			}
@@ -980,7 +993,7 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 		delete (this.allViews())[vid];
 	};
 	ViewManager.prototype.ancestor = function (vid, view) {
-		var uid = (view) ? view.vid() : null;
+		var uid = (view instanceof View) ? view.vid() : null;
 		return (uid) ? this.setPredicateValue(vid, "ancestor", uid) :
 		(uid = this.getPredicateValue(vid, "ancestor")) ? (this.allViews())[uid] : null;
 	};
@@ -1503,11 +1516,14 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 		this.allControllers = function () {
 			return controllers;
 		};
+		this.hasController = function (cid) {
+			return (cid in controllers);
+		};
 	}
 
 	Model = (function () {
 
-		function initialize(pairs, idKey) {
+		function initialize(pairs, idKey, parameters) {
 			var mid;
 			this.mid = (function (mid) {
 				return function () {
@@ -1515,11 +1531,11 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 				};
 			}(mid = createMID(createUID())));
 			modelManager.dispose(mid, this);
-			modelManager.initialize(mid, pairs, idKey);
+			modelManager.initialize(mid, pairs, idKey, parameters);
 		}
 
-		function Model(pairs, idKey) {
-			initialize.call(this, pairs, idKey);
+		function Model(pairs, idKey, parameters) {
+			initialize.call(this, pairs, idKey, parameters);
 		}
 		Model.prototype.get = function (key) {
 			return modelManager.get(this.mid(), key);
@@ -1570,53 +1586,53 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 			modelManager.discard(this.mid());
 		};
 		Model.prototype.descendant = (function (Parent) {
-			function initialize(ancestor, pairs, idKey) {
+			function initialize(ancestor, pairs, idKey, parameters) {
 				var mid;
-				this.constructor.call(this, pairs, idKey); //ancestor.constructor.call(this, pairs, idKey);
+				this.constructor.call(this, pairs, idKey, parameters); //ancestor.constructor.call(this, pairs, idKey, parameters);
 				modelManager.ancestor(mid = this.mid(), ancestor);
 				modelManager.inherit(ancestor.mid(), mid);
 			}
-			function child(Parent, parent, parentPairs, parentIdKey) {
+			function child(Parent, parent, parentPairs, parentIdKey, parentParameters) {
 				var surrogate = new Parent;
-				function Model(pairs, idKey) {
-					initialize.call(this, parent, pattern.hash.mix(parentPairs, pairs), idKey || parentIdKey);
+				function Model(pairs, idKey, parameters) {
+					initialize.call(this, parent, pattern.hash.mix(parentPairs, pairs), idKey || parentIdKey, pattern.hash.mix(parentParameters, parameters));
 				}
 				Model.prototype = surrogate;
 				Model.prototype.ancestor = function () {
 					return modelManager.ancestor(this.mid());
 				};
 				Model.prototype.descendant = (function (Parent) {
-					return function (pairs, idKey) {
-						return child.call(this, Parent, this, pattern.hash.mix(parentPairs, pairs), idKey || parentIdKey);
+					return function (pairs, idKey, parameters) {
+						return child.call(this, Parent, this, pattern.hash.mix(parentPairs, pairs), idKey || parentIdKey, pattern.hash.mix(parentParameters, parameters));
 					};
 				}(Model));
 				modelManager.discard(surrogate.mid());
 				return pattern.inherit(Parent, Model);
 			}
-			return function (pairs, idKey) {
-				return child.call(this, Parent, this, pairs, idKey);
+			return function (pairs, idKey, parameters) {
+				return child.call(this, Parent, this, pairs, idKey, parameters);
 			};
 		}(Model));
 		Model.descendant = (function (Parent) {
-			function initialize(pairs, idKey) {
-				this.constructor.call(this, pairs, idKey);
+			function initialize(pairs, idKey, parameters) {
+				this.constructor.call(this, pairs, idKey, parameters);
 			}
-			function child(Parent, parentPairs, parentIdKey) {
+			function child(Parent, parentPairs, parentIdKey, parentParameters) {
 				var surrogate = new Parent;
-				function Model(pairs, idKey) {
-					initialize.call(this, pattern.hash.mix(parentPairs, pairs), idKey || parentIdKey);
+				function Model(pairs, idKey, parameters) {
+					initialize.call(this, pattern.hash.mix(parentPairs, pairs), idKey || parentIdKey, pattern.hash.mix(parentParameters, parameters));
 				}
 				Model.prototype = surrogate;
-				Model.descendant = (function (Parent) {
-					return function (pairs, idKey) {
-						return child.call(this, Parent, pattern.hash.mix(parentPairs, pairs), idKey || parentIdKey);
+				Model.descendant = (function (Parent, parentPairs, parentIdKey, parentParameters) {
+					return function (pairs, idKey, parameters) {
+						return child.call(this, Parent, pattern.hash.mix(parentPairs, pairs), idKey || parentIdKey, pattern.hash.mix(parentParameters, parameters));
 					};
-				}(Model));
+				}(Model, parentPairs, parentIdKey, parentParameters));
 				modelManager.discard(surrogate.mid());
 				return pattern.inherit(Parent, Model);
 			}
-			return function (pairs, idKey) {
-				return child.call(this, Parent, pairs, idKey);
+			return function (pairs, idKey, parameters) {
+				return child.call(this, Parent, pairs, idKey, parameters);
 			};
 		}(Model));
 
@@ -1626,7 +1642,7 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 
 	ModelList = (function () {
 
-		function initialize(pairsList, idKey) {
+		function initialize(pairsList, idKey, parameters) {
 			var lid;
 			this.lid = (function (lid) {
 				return function () {
@@ -1634,12 +1650,12 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 				};
 			}(lid = createLID(createUID())));
 			modelListManager.dispose(lid, this);
-			modelListManager.initialize(lid, pairsList, idKey);
+			modelListManager.initialize(lid, pairsList, idKey, parameters);
 			modelListManager.subscribe(lid);
 		}
 
-		function ModelList(pairsList, idKey) {
-			initialize.call(this, pairsList, idKey);
+		function ModelList(pairsList, idKey, parameters) {
+			initialize.call(this, pairsList, idKey, parameters);
 		}
 		ModelList.prototype.get = function (index) {
 			return modelListManager.get(this.lid(), index);
@@ -1676,53 +1692,53 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 		};
 		ModelList.prototype.Model = Model;
 		ModelList.prototype.descendant = (function (Parent) {
-			function initialize(ancestor, pairsList, idKey) {
+			function initialize(ancestor, pairsList, idKey, parameters) {
 				var lid;
-				this.constructor.call(this, pairsList, idKey); //ancestor.constructor.call(this, pairsList, idKey);
+				this.constructor.call(this, pairsList, idKey, parameters); //ancestor.constructor.call(this, pairsList, idKey, parameters);
 				modelListManager.ancestor(lid = this.lid(), ancestor);
 				modelListManager.inherit(ancestor.lid(), lid);
 			}
-			function child(Parent, parent, parentPairs, parentIdKey) {
+			function child(Parent, parent, parentPairs, parentIdKey, parentParameters) {
 				var surrogate = new Parent;
-				function ModelList(pairsList, idKey) {
-					initialize.call(this, parent, pattern.list.mix(parentPairs, pairsList), idKey || parentIdKey);
+				function ModelList(pairsList, idKey, parameters) {
+					initialize.call(this, parent, pattern.list.mix(parentPairs, pairsList), idKey || parentIdKey, pattern.hash.mix(parentParameters, parameters));
 				}
 				ModelList.prototype = surrogate;
 				ModelList.prototype.ancestor = function () {
 					return modelListManager.ancestor(this.lid());
 				};
 				ModelList.prototype.descendant = (function (Parent) {
-					return function (pairsList, idKey) {
-						return child.call(this, Parent, this, pattern.list.mix(parentPairs, pairsList), idKey || parentIdKey);
+					return function (pairsList, idKey, parameters) {
+						return child.call(this, Parent, this, pattern.list.mix(parentPairs, pairsList), idKey || parentIdKey, pattern.hash.mix(parentParameters, parameters));
 					};
 				}(ModelList));
 				modelListManager.discard(surrogate.lid());
 				return pattern.inherit(Parent, ModelList);
 			}
-			return function (pairsList, idKey) {
-				return child.call(this, Parent, this, pairsList, idKey);
+			return function (pairsList, idKey, parameters) {
+				return child.call(this, Parent, this, pairsList, idKey, parameters);
 			};
 		}(ModelList));
 		ModelList.descendant = (function (Parent) {
-			function initialize(pairsList, idKey) {
-				this.constructor.call(this, pairsList, idKey);
+			function initialize(pairsList, idKey, parameters) {
+				this.constructor.call(this, pairsList, idKey, parameters);
 			}
-			function child(Parent, parentPairs, parentIdKey) {
+			function child(Parent, parentPairs, parentIdKey, parentParameters) {
 				var surrogate = new Parent;
-				function ModelList(pairsList, idKey) {
-					initialize.call(this, pattern.list.mix(parentPairs, pairsList), idKey || parentIdKey);
+				function ModelList(pairsList, idKey, parameters) {
+					initialize.call(this, pattern.list.mix(parentPairs, pairsList), idKey || parentIdKey, pattern.hash.mix(parentParameters, parameters));
 				}
 				ModelList.prototype = surrogate;
-				ModelList.descendant = (function (Parent, parentPairs, parentIdKey) {
-					return function (pairsList, idKey) {
-						return child.call(this, Parent, pattern.list.mix(parentPairs, pairsList), idKey || parentIdKey);
+				ModelList.descendant = (function (Parent, parentPairs, parentIdKey, parentParameters) {
+					return function (pairsList, idKey, parameters) {
+						return child.call(this, Parent, pattern.list.mix(parentPairs, pairsList), idKey || parentIdKey, pattern.hash.mix(parentParameters, parameters));
 					};
-				}(ModelList, parentPairs, parentIdKey));
+				}(ModelList, parentPairs, parentIdKey, parentParameters));
 				modelListManager.discard(surrogate.lid());
 				return pattern.inherit(Parent, ModelList);
 			}
-			return function (pairsList, idKey) {
-				return child.call(this, Parent, pairsList, idKey);
+			return function (pairsList, idKey, parameters) {
+				return child.call(this, Parent, pairsList, idKey, parameters);
 			};
 		}(ModelList));
 		return ModelList;
