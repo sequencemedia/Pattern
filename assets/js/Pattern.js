@@ -794,18 +794,20 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 					modelList = this.modelListFor(lid);
 					do {
 						model = array[i];
-						if (model instanceof Model && modelStorage.hasModel(mid = model.mid())) { //as above, so below
-							n = 0;
-							m = modelList.length;
-							if (n < m) {
-								do {
-									if (modelList[n] === mid) {
-										modelList.splice(n, 1);
-										this.broadcast(lid, "delete", mid);
-										this.raise(lid, "remove", mid);
-										break;
-									}
-								} while (++n < m);
+						if (model instanceof Model) { //as above, so below
+							if (modelStorage.hasModel(mid = model.mid())) {
+								n = 0;
+								m = modelList.length;
+								if (n < m) {
+									do {
+										if (modelList[n] === mid) {
+											modelList.splice(n, 1);
+											this.broadcast(lid, "delete", mid);
+											this.raise(lid, "remove", mid);
+											break;
+										}
+									} while (++n < m);
+								}
 							}
 						}
 					} while (++i < j);
@@ -1731,7 +1733,7 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 	View = (function () {
 
 		function initialize(model, parameters) {
-			var vid;
+			var vid, mid;
 			this.vid = (function (vid) {
 				return function () {
 					return vid;
@@ -1739,8 +1741,10 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 			}(vid = createVID(createUID())));
 			viewManager.dispose(vid, this);
 			if (model instanceof Model) {
-				viewManager.model(vid, model);
-				viewManager.subscribe(vid, model.mid(), parameters || (parameters = {}));
+				if (modelStorage.hasModel(mid = model.mid())) {
+					viewManager.model(vid, model);
+					viewManager.subscribe(vid, mid, parameters || (parameters = {}));
+				}
 			}
 		}
 
@@ -1822,9 +1826,11 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 			}(lid = createLID(createUID())));
 			viewListManager.dispose(lid, this);
 			if (modelList instanceof ModelList) {
-				viewListManager.modelList(lid, modelList);
-				viewListManager.initialize(lid, uid = modelList.lid(), parameters || (parameters = {}));
-				viewListManager.subscribe(lid, uid, parameters);
+				if (modelListStorage.hasModelList(uid = modelList.lid())) {
+					viewListManager.modelList(lid, modelList);
+					viewListManager.initialize(lid, uid, parameters || (parameters = {}));
+					viewListManager.subscribe(lid, uid, parameters);
+				}
 			}
 		}
 
@@ -1923,7 +1929,7 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 	Controller = (function () {
 
 		function initialize(viewList, parameters) {
-			var cid;
+			var cid, lid;
 			this.cid = (function (cid) {
 				return function () {
 					return cid;
@@ -1931,8 +1937,10 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 			}(cid = createCID(createUID())));
 			controllerManager.dispose(cid, this);
 			if (viewList instanceof ViewList) {
-				controllerManager.viewList(cid, viewList);
-				controllerManager.subscribe(cid, viewList.lid(), parameters || (parameters = {}));
+				if (viewListStorage.hasViewList(lid = viewList.lid())) {
+					controllerManager.viewList(cid, viewList);
+					controllerManager.subscribe(cid, lid, parameters || (parameters = {}));
+				}
 			}
 		}
 
