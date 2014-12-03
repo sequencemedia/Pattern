@@ -7,9 +7,10 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 	*/
 	/*
 		TODO:
-			When an instance is discarded it is deleted from the application cache. There is no way to insert it again
-			However, a model can be added into a model list or a view can be added into a view list even though it doesn't
-			exist in the application cache anymore (as far as the application is concerned it does not exist)
+			When a Model, ModelList, View, ViewList or Controller is discarded it is deleted from the application cache.
+			There is no way to insert it again. A Model instance cannot be added into a ModelList and a View instance
+			cannot be added into a ViewList if either of them have been deleted from the application cache (whether
+			because it was discarded or because it belongs to another instance of Pattern).
 	*/
 
 	"use strict";
@@ -599,6 +600,9 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 		this.allModels = function () {
 			return models;
 		};
+		this.hasModel = function (mid) {
+			return (mid in models);
+		};
 	}
 
 	function ModelListManager() {}
@@ -640,16 +644,18 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 			upperBound,
 			lowerBound,
 			mid;
-		if (typeof index === "number") {
-			modelList = this.modelListFor(lid);
-			i = 0;
-			j = modelList.length;
-			if (i < j) {
-				upperBound = j - 1;
-				lowerBound = 0;
-				if (!(index > upperBound || index < lowerBound)) {
-					mid = modelList[index];
-					return (this.allModels())[mid];
+		if (modelListStorage.hasModelList(lid)) {
+			if (typeof index === "number") {
+				modelList = this.modelListFor(lid);
+				i = 0;
+				j = modelList.length;
+				if (i < j) {
+					upperBound = j - 1;
+					lowerBound = 0;
+					if (!(index > upperBound || index < lowerBound)) {
+						mid = modelList[index];
+						return (this.allModels())[mid];
+					}
 				}
 			}
 		}
@@ -661,46 +667,52 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 			upperBound,
 			lowerBound,
 			mid;
-		if (typeof index === "number" && model instanceof Model) {
-			modelList = this.modelListFor(lid);
-			i = 0;
-			j = modelList.length;
-			mid = model.mid();
-			if (i === j) {
-				modelList.push(mid);
-			} else {
-				upperBound = j - 1; //j > 0
-				lowerBound = 0;
-				index = index > upperBound ? j : index < lowerBound ? lowerBound : index ;
-				do {
-					if (modelList[i] === mid) {
-						if (i === index) return ;
-						modelList.splice(i, 1);
-						break;
+		if (modelListStorage.hasModelList(lid)) {
+			if (typeof index === "number" && model instanceof Model) {
+				if (modelStorage.hasModel(mid = model.mid())) {
+					modelList = this.modelListFor(lid);
+					i = 0;
+					j = modelList.length;
+					mid = model.mid();
+					if (i === j) {
+						modelList.push(mid);
+					} else {
+						upperBound = j - 1; //j > 0
+						lowerBound = 0;
+						index = index > upperBound ? j : index < lowerBound ? lowerBound : index ;
+						do {
+							if (modelList[i] === mid) {
+								if (i === index) return ;
+								modelList.splice(i, 1);
+								break;
+							}
+						} while (++i < j);
+						modelList.splice(index, 0, mid);
 					}
-				} while (++i < j);
-				modelList.splice(index, 0, mid); //this.internal.raise(lid, "set", mid);
+				}
 			}
 		}
 	};
 	ModelListManager.prototype.add = function (lid, model) {
-		var modelList,
-			i, j,
-			mid;
-		if (model instanceof Model) { //&& storage.has(model.mid())
-			modelList = this.modelListFor(lid);
-			i = 0;
-			j = modelList.length;
-			mid = model.mid();
-			if (i < j) {
-				do {
-					if (modelList[i] === mid) return ;
-				} while (++i < j);
+		var mid,
+			modelList,
+			i, j;
+		if (modelListStorage.hasModelList(lid)) {
+			if (model instanceof Model) {
+				if (modelStorage.hasModel(mid = model.mid())) {
+					modelList = this.modelListFor(lid);
+					i = 0;
+					j = modelList.length;
+					if (i < j) {
+						do {
+							if (modelList[i] === mid) return ;
+						} while (++i < j);
+					}
+					modelList.push(mid);
+					this.broadcast(lid, "insert", mid);
+					this.raise(lid, "add", mid);
+				}
 			}
-			modelList.push(mid);
-			//this.raise(lid, "add", mid);
-			this.broadcast(lid, "insert", mid);
-			this.raise(lid, "add", mid);
 		}
 	};
 	ModelListManager.prototype.addEach = function (lid, array) {
@@ -709,59 +721,62 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 			model,
 			mid,
 			n, m;
-		if ((array || false).constructor === Array) {
-			i = 0;
-			j = array.length;
-			if (i < j) {
-				modelList = this.modelListFor(lid);
-				do {
-					model = array[i];
-					if (model instanceof Model) { //&& storage.has(model.mid())
-						n = 0;
-						m = modelList.length;
-						mid = model.mid();
-						if (n === m) {
-							modelList.push(mid);
-							//this.raise(lid, "add", mid);
-							this.broadcast(lid, "insert", mid);
-							this.raise(lid, "add", mid);
-						} else {
-							do {
-								if (modelList[n] === mid) {
-									break;
+		if (modelListStorage.hasModelList(lid)) {
+			if ((array || false).constructor === Array) {
+				i = 0;
+				j = array.length;
+				if (i < j) {
+					modelList = this.modelListFor(lid);
+					do {
+						model = array[i];
+						if (model instanceof Model) {
+							if (modelStorage.hasModel(mid = model.mid())) {
+								n = 0;
+								m = modelList.length;
+								if (n === m) {
+									modelList.push(mid);
+									this.broadcast(lid, "insert", mid);
+									this.raise(lid, "add", mid);
+								} else {
+									do {
+										if (modelList[n] === mid) {
+											break;
+										}
+									} while (++n < m);
+									if (n === m) {
+										modelList.push(mid);
+										this.broadcast(lid, "insert", mid);
+										this.raise(lid, "add", mid);
+									}
 								}
-							} while (++n < m);
-							if (n === m) {
-								modelList.push(mid);
-								//this.raise(lid, "add", mid);
-								this.broadcast(lid, "insert", mid);
-								this.raise(lid, "add", mid);
 							}
 						}
-					}
-				} while (++i < j);
+					} while (++i < j);
+				}
 			}
 		}
 	};
 	ModelListManager.prototype.remove = function (lid, model) {
-		var modelList,
-			i, j,
-			mid;
-		if (model instanceof Model) { //&& storage.has(model.mid())
-			modelList = this.modelListFor(lid);
-			i = 0;
-			j = modelList.length;
-			if (i < j) {
-				mid = model.mid();
-				do {
-					if (modelList[i] === mid) {
-						modelList.splice(i, 1);
-						//this.raise(lid, "remove", mid);
-						this.broadcast(lid, "delete", mid);
-						this.raise(lid, "remove", mid);
-						break;
+		var mid,
+			modelList,
+			i, j;
+		if (modelListStorage.hasModelList(lid)) {  //there's no point looking in the model list if the model is not in storage
+			if (model instanceof Model) {
+				if (modelStorage.hasModel(mid = model.mid())) {
+					modelList = this.modelListFor(lid);
+					i = 0;
+					j = modelList.length;
+					if (i < j) {
+						do {
+							if (modelList[i] === mid) {
+								modelList.splice(i, 1);
+								this.broadcast(lid, "delete", mid);
+								this.raise(lid, "remove", mid);
+								break;
+							}
+						} while (++i < j);
 					}
-				} while (++i < j);
+				}
 			}
 		}
 	};
@@ -771,46 +786,52 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 			model,
 			mid,
 			n, m;
-		if ((array || false).constructor === Array) {
-			i = 0;
-			j = array.length;
-			if (i < j) {
-				modelList = this.modelListFor(lid);
-				do {
-					model = array[i];
-					if (model instanceof Model) { //&& storage.has(model.mid())
-						n = 0;
-						m = modelList.length;
-						if (n < m) {
-							mid = model.mid();
-							do {
-								if (modelList[n] === mid) {
-									modelList.splice(n, 1);
-									//this.raise(lid, "remove", mid);
-									this.broadcast(lid, "delete", mid);
-									this.raise(lid, "remove", mid);
-									break;
-								}
-							} while (++n < m);
+		if (modelListStorage.hasModelList(lid)) {
+			if ((array || false).constructor === Array) {
+				i = 0;
+				j = array.length;
+				if (i < j) {
+					modelList = this.modelListFor(lid);
+					do {
+						model = array[i];
+						if (model instanceof Model && modelStorage.hasModel(mid = model.mid())) { //as above, so below
+							n = 0;
+							m = modelList.length;
+							if (n < m) {
+								do {
+									if (modelList[n] === mid) {
+										modelList.splice(n, 1);
+										this.broadcast(lid, "delete", mid);
+										this.raise(lid, "remove", mid);
+										break;
+									}
+								} while (++n < m);
+							}
 						}
-					}
-				} while (++i < j);
+					} while (++i < j);
+				}
 			}
 		}
 	};
 	ModelListManager.prototype.all = function (lid) {
-		var modelList = this.modelListFor(lid),
-			i = 0, j = modelList.length, all = [],
+		var modelList,
+			i, j,
 			allModels,
 			mid,
-			model;
-		if (i < j) {
-			allModels = this.allModels();
-			do {
-				mid = modelList[i];
-				model = allModels[mid];
-				all.push(model);
-			} while (++i < j);
+			model,
+			all = [];
+		if (modelListStorage.hasModelList(lid)) {
+			modelList = this.modelListFor(lid);
+			i = 0;
+			j = modelList.length;
+			if (i < j) {
+				allModels = this.allModels();
+				do {
+					mid = modelList[i];
+					model = allModels[mid];
+					all.push(model);
+				} while (++i < j);
+			}
 		}
 		return all;
 	};
@@ -917,6 +938,9 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 		this.allModelLists = function () {
 			return modelLists;
 		};
+		this.hasModelList = function (lid) {
+			return (lid in modelLists);
+		};
 	}
 
 	function ViewManager() {}
@@ -979,6 +1003,9 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 		this.allViews = function () {
 			return views;
 		};
+		this.hasView = function (vid) {
+			return (vid in views);
+		};
 	}
 
 	function ViewListManager() {}
@@ -1028,71 +1055,79 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 			upperBound,
 			lowerBound,
 			vid;
-		if (typeof index === "number") {
-			viewList = this.viewListFor(lid);
-			i = 0;
-			j = viewList.length;
-			if (i < j) {
-				upperBound = j - 1;
-				lowerBound = 0;
-				if (!(index > upperBound || index < lowerBound)) {
-					vid = viewList[index];
-					return (viewStorage.allViews())[vid];
+		if (viewListStorage.hasViewList(lid)) {
+			if (typeof index === "number") {
+				viewList = this.viewListFor(lid);
+				i = 0;
+				j = viewList.length;
+				if (i < j) {
+					upperBound = j - 1;
+					lowerBound = 0;
+					if (!(index > upperBound || index < lowerBound)) {
+						vid = viewList[index];
+						return (viewStorage.allViews())[vid];
+					}
 				}
 			}
 		}
 		return null;
 	};
 	ViewListManager.prototype.set = function (lid, index, view) {
-		var viewList,
+		var vid,
+			viewList,
 			i, j,
 			upperBound,
 			lowerBound,
 			vid;
-		if (typeof index === "number" && view instanceof View) {
-			viewList = this.viewListFor(lid);
-			i = 0;
-			j = viewList.length;
-			vid = view.vid();
-			if (i === j) {
-				viewList.push(vid);
-			} else {
-				upperBound = j - 1;
-				lowerBound = 0;
-				index = index > upperBound ? j : index < lowerBound ? lowerBound : index ;
-				do {
-					if (viewList[i] === vid) {
-						if (i === index) return ;
-						viewList.splice(i, 1);
-						break;
+		if (viewListStorage.hasViewList(lid)) {
+			if (typeof index === "number" && view instanceof View) {
+				if (viewStorage.hasView(vid = view.vid())) {
+					viewList = this.viewListFor(lid);
+					i = 0;
+					j = viewList.length;
+					if (i === j) {
+						viewList.push(vid);
+					} else {
+						upperBound = j - 1;
+						lowerBound = 0;
+						index = index > upperBound ? j : index < lowerBound ? lowerBound : index ;
+						do {
+							if (viewList[i] === vid) {
+								if (i === index) return ;
+								viewList.splice(i, 1);
+								break;
+							}
+						} while (++i < j);
+						viewList.splice(index, 0, vid); //this.internal.raise(lid, "set", vid);
 					}
-				} while (++i < j);
-				viewList.splice(index, 0, vid); //this.internal.raise(lid, "set", vid);
+				}
 			}
 		}
 	};
 	ViewListManager.prototype.add = function (lid, view) {
-		var viewList,
+		var vid,
+			viewList,
 			i, j,
-			vid,
 			mid;
-		if (view instanceof View) { // && storage.has(view.vid())
-			viewList = this.viewListFor(lid);
-			i = 0;
-			j = viewList.length;
-			vid = view.vid();
-			if (i < j) {
-				do {
-					if (viewList[i] === vid) return ;
-				} while (++i < j);
+		if (viewListStorage.hasViewList(lid)) {
+			if (view instanceof View) {
+				if (viewStorage.hasView(vid = view.vid())) {
+					viewList = this.viewListFor(lid);
+					i = 0;
+					j = viewList.length;
+					if (i < j) {
+						do {
+							if (viewList[i] === vid) return ;
+						} while (++i < j);
+					}
+					viewList.push(vid);
+					if (mid = this.modelFor(vid)) {
+						viewList[mid] = vid;
+					}
+					this.broadcast(lid, "insert", vid);
+					this.raise(lid, "add", vid);
+				}
 			}
-			viewList.push(vid);
-			if (mid = this.modelFor(vid)) {
-				viewList[mid] = vid;
-			}
-			//this.raise(lid, "add", vid);
-			this.broadcast(lid, "insert", vid);
-			this.raise(lid, "add", vid);
 		}
 	};
 	ViewListManager.prototype.addEach = function (lid, array) {
@@ -1102,69 +1137,72 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 			vid,
 			n, m,
 			mid;
-		if ((array || false).constructor === Array) {
-			i = 0;
-			j = array.length;
-			if (i < j) {
-				viewList = this.viewListFor(lid);
-				do {
-					view = array[i];
-					if (view instanceof View) { //&& storage.has(view.vid())
-						n = 0;
-						m = viewList.length;
-						vid = view.vid();
-						if (n === m) {
-							viewList.push(vid);
-							if (mid = this.modelFor(vid)) {
-								viewList[mid] = vid;
-							}
-							//this.raise(lid, "add", vid);
-							this.broadcast(lid, "insert", vid);
-							this.raise(lid, "add", vid);
-						} else {
-							do {
-								if (viewList[n] === vid) {
-									break;
+		if (viewListStorage.hasViewList(lid)) {
+			if ((array || false).constructor === Array) {
+				i = 0;
+				j = array.length;
+				if (i < j) {
+					viewList = this.viewListFor(lid);
+					do {
+						view = array[i];
+						if (view instanceof View) {
+							if (viewStorage.hasView(vid = view.vid())) {
+								n = 0;
+								m = viewList.length;
+								if (n === m) {
+									viewList.push(vid);
+									if (mid = this.modelFor(vid)) {
+										viewList[mid] = vid;
+									}
+									this.broadcast(lid, "insert", vid);
+									this.raise(lid, "add", vid);
+								} else {
+									do {
+										if (viewList[n] === vid) {
+											break;
+										}
+									} while (++n < m);
+									if (n === m) {
+										viewList.push(vid);
+										if (mid = this.modelFor(vid)) {
+											viewList[mid] = vid;
+										}
+										this.broadcast(lid, "insert", vid);
+										this.raise(lid, "add", vid);
+									}
 								}
-							} while (++n < m);
-							if (n === m) {
-								viewList.push(vid);
-								if (mid = this.modelFor(vid)) {
-									viewList[mid] = vid;
-								}
-								//this.raise(lid, "add", vid);
-								this.broadcast(lid, "insert", vid);
-								this.raise(lid, "add", vid);
 							}
 						}
-					}
-				} while (++i < j);
+					} while (++i < j);
+				}
 			}
 		}
 	};
 	ViewListManager.prototype.remove = function (lid, view) {
-		var viewList,
+		var vid,
+			viewList,
 			i, j,
-			vid,
 			mid;
-		if (view instanceof View) { //&& storage.has(view.vid())
-			viewList = this.viewListFor(lid);
-			i = 0;
-			j = viewList.length;
-			if (i < j) {
-				vid = view.vid();
-				do {
-					if (viewList[i] === vid) {
-						viewList.splice(i, 1);
-						if (mid = this.modelFor(vid)) {
-							delete viewList[mid];
-						}
-						//this.raise(lid, "remove", vid);
-						this.broadcast(lid, "delete", vid);
-						this.raise(lid, "remove", vid);
-						break;
+		if (viewListStorage.hasViewList(lid)) {
+			if (view instanceof View) {
+				if (viewStorage.hasView(vid = view.vid())) {
+					viewList = this.viewListFor(lid);
+					i = 0;
+					j = viewList.length;
+					if (i < j) {
+						do {
+							if (viewList[i] === vid) {
+								viewList.splice(i, 1);
+								if (mid = this.modelFor(vid)) {
+									delete viewList[mid];
+								}
+								this.broadcast(lid, "delete", vid);
+								this.raise(lid, "remove", vid);
+								break;
+							}
+						} while (++i < j);
 					}
-				} while (++i < j);
+				}
 			}
 		}
 	};
@@ -1175,61 +1213,74 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 			vid,
 			n, m,
 			mid;
-		if ((array || false).constructor === Array) {
-			i = 0;
-			j = array.length;
-			if (i < j) {
-				viewList = this.viewListFor(lid);
-				do {
-					view = array[i];
-					if (view instanceof View) { //&& storage.has(view.vid())
-						n = 0;
-						m = viewList.length;
-						if (n < m) {
-							vid = view.vid();
-							do {
-								if (viewList[n] === vid) {
-									viewList.splice(n, 1);
-									if (mid = this.modelFor(vid)) {
-										delete viewList[mid];
-									}
-									//this.raise(lid, "remove", vid);
-									this.broadcast(lid, "delete", vid);
-									this.raise(lid, "remove", vid);
-									break;
+		if (viewListStorage.hasViewList(lid)) {
+			if ((array || false).constructor === Array) {
+				i = 0;
+				j = array.length;
+				if (i < j) {
+					viewList = this.viewListFor(lid);
+					do {
+						view = array[i];
+						if (view instanceof View) {
+							if (viewStorage.hasView(vid = view.vid())) {
+								n = 0;
+								m = viewList.length;
+								if (n < m) {
+									do {
+										if (viewList[n] === vid) {
+											viewList.splice(n, 1);
+											if (mid = this.modelFor(vid)) {
+												delete viewList[mid];
+											}
+											this.broadcast(lid, "delete", vid);
+											this.raise(lid, "remove", vid);
+											break;
+										}
+									} while (++n < m);
 								}
-							} while (++n < m);
+							}
 						}
-					}
-				} while (++i < j);
+					} while (++i < j);
+				}
 			}
 		}
 	};
 	ViewListManager.prototype.all = function (lid) {
-		var viewList = this.viewListFor(lid),
-			i = 0, j = viewList.length, all = [],
+		var viewList,
+			i, j,
 			allViews,
 			vid,
-			view;
-		if (i < j) {
-			allViews = viewStorage.allViews();
-			do {
-				vid = viewList[i];
-				view = allViews[vid];
-				all.push(view);
-			} while (++i < j);
+			view,
+			all = [];
+		if (viewListStorage.hasViewList(lid)) {
+			viewList = this.viewListFor(lid);
+			i = 0;
+			j = viewList.length;
+			if (i < j) {
+				allViews = viewStorage.allViews();
+				do {
+					vid = viewList[i];
+					view = allViews[vid];
+					all.push(view);
+				} while (++i < j);
+			}
 		}
 		return all;
 	};
 	ViewListManager.prototype.indexOf = function (lid, view) {
-		var viewList = this.viewListFor(lid),
-			i = 0, j = viewList.length,
+		var viewList,
+			i, j,
 			vid;
-		if (i < j) {
-			vid = view.vid();
-			do {
-				if (viewList[i] === vid) return i;
-			} while (++i < j);
+		if (viewListStorage.hasViewList(lid)) {
+			viewList = this.viewListFor(lid);
+			i = 0;
+			j = viewList.length;
+			if (i < j) {
+				vid = view.vid();
+				do {
+					if (viewList[i] === vid) return i;
+				} while (++i < j);
+			}
 		}
 		return -1;
 	};
@@ -1364,6 +1415,9 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 		var viewLists = {};
 		this.allViewLists = function () {
 			return viewLists;
+		};
+		this.hasViewList = function (lid) {
+			return (lid in viewLists);
 		};
 	}
 
@@ -1949,6 +2003,35 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 
 	}());
 
+	function discard() {
+		var allModels = modelStorage.allModels(),
+			allModelLists = modelListStorage.allModelLists(),
+			allViews = viewStorage.allViews(),
+			allViewLists = viewListStorage.allViewLists(),
+			allControllers = controllerStorage.allControllers(),
+			mid, vid, cid, lid, model, modelList, view, viewList, controller;
+		for (mid in allModels) {
+			model = allModels[mid];
+			model.discard();
+		}
+		for (lid in allModelLists) {
+			modelList = allModelLists[lid];
+			modelList.discard();
+		}
+		for (vid in allViews) {
+			view = allViews[vid];
+			view.discard();
+		}
+		for (lid in allViewLists) {
+			viewList = allViewLists[lid];
+			viewList.discard();
+		}
+		for (cid in allControllers) {
+			controller = allControllers[cid];
+			controller.discard();
+		}
+	}
+
 	channels = new Channels();
 
 	modelStorage = new ModelStorage();
@@ -1986,6 +2069,8 @@ window.controllerManager = controllerManager;
 		View: View,
 		ViewList: ViewList,
 		Controller: Controller,
+
+		discard: discard,
 
 		uid: (function () {
 			var uidPattern = "nn-n-n-n-nnn",
