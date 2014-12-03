@@ -270,8 +270,8 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 		this.external = new Channel();
 	}
 	Channels.prototype = new Manager();
-	Channels.prototype.contextFor = function (uid) { //return (storage.all())[uid];
-		return (this.allViews())[uid] || (this.allViewLists())[uid] || (this.allControllers())[uid];
+	Channels.prototype.contextFor = function (uid) { //console.log(uid, (this.allViews())[uid] || (this.allViewLists())[uid] || (this.allControllers())[uid] || (this.allModelLists())[uid] || (this.allModels())[uid]); //return (storage.all())[uid];
+		return (this.allViews())[uid] || (this.allViewLists())[uid] || (this.allControllers())[uid] || (this.allModelLists())[uid] || (this.allModels())[uid] ;
 	};
 
 	function ModelManager() {
@@ -1079,8 +1079,7 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 			viewList,
 			i, j,
 			upperBound,
-			lowerBound,
-			vid;
+			lowerBound;
 		if (viewListStorage.hasViewList(lid)) {
 			if (typeof index === "number" && view instanceof View) {
 				if (viewStorage.hasView(vid = view.vid())) {
@@ -1100,7 +1099,7 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 								break;
 							}
 						} while (++i < j);
-						viewList.splice(index, 0, vid); //this.internal.raise(lid, "set", vid);
+						viewList.splice(index, 0, vid);
 					}
 				}
 			}
