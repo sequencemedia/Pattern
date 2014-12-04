@@ -2,49 +2,6 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 
 	"use strict";
 
-	/*
-		Models broadcast() on the external channel
-		ModelLists, ViewLists broadcast() on the internal channel
-		ModelLists, ViewLists, Views raise() and queue() on the external channel
-	*/
-	/*
-		When a Model, ModelList, View, ViewList or Controller is discarded it is deleted from the application cache.
-		There is no way to insert it again. A Model instance cannot be added into a ModelList and a View instance
-		cannot be added into a ViewList if either of them have been deleted from the application cache (whether
-		because it was discarded or because it belongs to another instance of Pattern).
-	*/
-	/*
-		Store and Fetch mechanisms with hashes make for less JS but determining "key in hash" is generally slower
-		than iterating over a populated array (mileage may vary: this is reversed in FF). An iteration mechanism
-		in JS is generally faster than the native methods on the object (again, mileage may vary:
-
-			var i = ["value"].indexOf("value");
-
-		in Chrome is now generally much faster than
-
-			function indexOf(array, value) {
-				var n = 0,
-					j = array.length;
-				do {
-					if (array[n] === value) return n;
-				} while (++n < j);
-				return -1;
-			}
-
-			var i = indexOf(["value"], "value");
-
-		even though the latter was better until late 2013/early 2014 -- and assuming large populated arrays for a decent comparison).
-
-		Initially I began implementing a shared, master hash for storing all instances but moved away from that before deciding I
-		preferred a master hash for storage with several lists of instances. But maintaining those lists impedes performance where
-		it is desirable so I implemented several hashes for instances, instead, abandoning he master hash and the instance lists.
-
-		This version maintains a master hash and an instance hash because the master is useful in some cases (such as looking up an
-		event context) while an instance hash is better nearly everwhere else. Maintaining both is a performance cost so it is likely
-		that I shall improve this mechanism in the future.
-
-	*/
-
 	var pattern,
 		createUID,
 		Storage,
@@ -262,7 +219,6 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 			return (cid in controllers);
 		};
 	}
-	ControllerStorage.prototype = new Storage();
 	ControllerStorage.prototype = new Storage();
 	ControllerStorage.prototype.store = function (cid, controller) {
 		(this.all())[cid] = (
@@ -2160,23 +2116,6 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 	viewManager = new ViewManager();
 	viewListManager = new ViewListManager();
 	controllerManager = new ControllerManager();
-
-/*
-window.channelStorage = channelStorage;
-window.channelManager = channelManager;
-
-window.modelStorage = modelStorage;
-window.modelListStorage = modelListStorage;
-window.viewStorage = viewStorage;
-window.viewListStorage = viewListStorage;
-window.controllerStorage = controllerStorage;
-
-window.modelManager = modelManager;
-window.modelListManager = modelListManager;
-window.viewManager = viewManager;
-window.viewListManager = viewListManager;
-window.controllerManager = controllerManager;
-*/
 
 	return {
 
