@@ -33,11 +33,16 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 
 			var i = indexOf(["value"], "value");
 
-		even though the latter was better until late 2013/early 2014 -- assuming large populated arrays for a decent comparison).
+		even though the latter was better until late 2013/early 2014 -- and assuming large populated arrays for a decent comparison).
 
-		At the outset I began implementing a shared hash in Pattern for storing all instances but moved away from that
-		early on before later deciding I was right to prefer one hash for storage with several lists of instances
-		to determine what types of instance are being stored without).
+		Initially I began implementing a shared, master hash for storing all instances but moved away from that before deciding I
+		preferred a master hash for storage with several lists of instances. But maintaining those lists impedes performance where
+		it is desirable so I implemented several hashes for instances, instead, abandoning he master hash and the instance lists.
+
+		This version maintains a master hash and an instance hash because the master is useful in some cases (such as looking up an
+		event context) while an instance hash is better nearly everwhere else. Maintaining both is a performance cost so it is likely
+		that I shall improve this mechanism in the future.
+
 	*/
 
 	var pattern,
@@ -153,7 +158,7 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 		function Storage() {}
 		Storage.prototype.all = function () {
 			return all;
-		}
+		};
 		return Storage;
 	}());
 	Storage.prototype.indexOf = function (array, value) {
@@ -2117,7 +2122,15 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 			allViews = viewStorage.allViews(),
 			allViewLists = viewListStorage.allViewLists(),
 			allControllers = controllerStorage.allControllers(),
-			mid, vid, cid, lid, model, modelList, view, viewList, controller;
+			mid,
+			vid,
+			cid,
+			lid,
+			model,
+			modelList,
+			view,
+			viewList,
+			controller;
 		for (mid in allModels) {
 			model = allModels[mid];
 			model.discard();
@@ -2156,7 +2169,7 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 	viewListManager = new ViewListManager();
 	controllerManager = new ControllerManager();
 
-
+/*
 window.channelStorage = channelStorage;
 window.channelManager = channelManager;
 
@@ -2171,7 +2184,7 @@ window.modelListManager = modelListManager;
 window.viewManager = viewManager;
 window.viewListManager = viewListManager;
 window.controllerManager = controllerManager;
-
+*/
 
 	return {
 
