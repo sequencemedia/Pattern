@@ -161,14 +161,6 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 		};
 		return Storage;
 	}());
-	Storage.prototype.indexOf = function (array, value) {
-		var i = 0,
-			j = array.length;
-		do {
-			if (array[i] === value) return i;
-		} while (++i < j);
-		return null;
-	};
 	Storage.prototype.fetch = function (key) {
 		return (this.all())[key];
 	};
@@ -1085,13 +1077,13 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 	};
 	ViewManager.prototype.queue = function (vid, key, etc) {
 		channelManager.external.queue(vid, key, {
-			view: (viewStorage.allViews())[vid],
+			view: viewStorage.fetch(vid),
 			etc: etc
 		});
 	};
 	ViewManager.prototype.raise = function (vid, key, etc) {
 		channelManager.external.raise(vid, key, {
-			view: (viewStorage.allViews())[vid],
+			view: viewStorage.fetch(vid),
 			etc: etc
 		});
 	};
@@ -1190,7 +1182,7 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 					lowerBound = 0;
 					if (!(index > upperBound || index < lowerBound)) {
 						vid = viewList[index];
-						return (viewStorage.allViews())[vid];
+						return viewStorage.fetch(vid);
 					}
 				}
 			}
@@ -1493,7 +1485,7 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 			channelManager.internal.createSubscription(lid, uid, {
 				insert: function (mid) { //console.log("(ViewListManager:ModeList)insert()", mid);
 					var viewList = viewListManager.viewListFor(lid),
-						vid = (new this.View((viewListManager.allModels())[mid])).vid();
+						vid = (new this.View(modelStorage.fetch(mid))).vid();
 					viewList.push(vid);
 					viewList[mid] = vid;
 					viewListManager.broadcast(lid, "insert", vid);
@@ -1608,7 +1600,7 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 	ControllerManager.prototype.ancestor = function (cid, controller) {
 		var uid = (controller instanceof Controller) ? controller.cid() : null;
 		return (uid) ? this.setPredicateValue(cid, "ancestor", uid) :
-		(uid = this.getPredicateValue(cid, "ancestor")) ? (this.allControllers())[uid] : null;
+		(uid = this.getPredicateValue(cid, "ancestor")) ? controllerStorage.fetch(uid) : null;
 	};
 
 	Model = (function () {
