@@ -22,24 +22,11 @@ describe("Pattern.Model", function () {
 			describe("With an ID key", function () {
 
 				beforeEach(function () {
-					model = new Pattern.Model({ id: "ID", a: 1, b: 2, c: 3 }, "c");
+					model = new Pattern.Model({ a: 1, b: 2, c: 3 });
 				});
 
 				it("Instantiates the Model constructor", function () {
 					expect(model instanceof Pattern.Model).toBe(true);
-				});
-
-				describe("Getting the id from an instance of the model", function () {
-					it("Gets the id", function () {
-						expect(model.get("id")).toBe(3);
-					});
-				});
-
-				describe("Setting the id on an instance of the model", function () {
-					it("Sets the id", function () {
-						expect(model.set("id", "Changed ID")).toBeUndefined();
-						expect(model.get("id")).toBe("Changed ID");
-					});
 				});
 
 				describe("Getting values from an instance of the model", function () {
@@ -66,24 +53,11 @@ describe("Pattern.Model", function () {
 			describe("Without an ID key", function () {
 
 				beforeEach(function () {
-					model = new Pattern.Model({ id: "ID", a: 1, b: 2, c: 3 });
+					model = new Pattern.Model({ a: 1, b: 2, c: 3 });
 				});
 
 				it("Instantiates the Model constructor", function () {
 					expect(model instanceof Pattern.Model).toBe(true);
-				});
-
-				describe("Getting the id from an instance of the model", function () {
-					it("Gets the id", function () {
-						expect(model.get("id")).toBe("ID");
-					});
-				});
-
-				describe("Setting the id on an instance of the model", function () {
-					it("Sets the id", function () {
-						expect(model.set("id", "Changed ID")).toBeUndefined();
-						expect(model.get("id")).toBe("Changed ID");
-					});
 				});
 
 				describe("Getting values from an instance of the model", function () {
@@ -119,19 +93,6 @@ describe("Pattern.Model", function () {
 				expect(model instanceof Pattern.Model).toBe(true);
 			});
 
-			describe("Getting the id from an instance of the model", function () {
-				it("Gets undefined", function () {
-					expect(model.get("id")).toBeUndefined();
-				});
-			});
-
-			describe("Setting the id on an instance of the model", function () {
-				it("Sets the id", function () {
-					expect(model.set("id", "Changed ID")).toBeUndefined();
-					expect(model.get("id")).toBe("Changed ID");
-				});
-			});
-
 			describe("Getting the value for a key of an undefined pair", function () {
 				it("Gets undefined", function () {
 					expect(model.get("x")).toBeUndefined();
@@ -152,7 +113,7 @@ describe("Pattern.Model", function () {
 	describe("Getting values from an instance of the model", function () {
 
 		beforeEach(function () {
-			model = new Pattern.Model({ id: "ID", a: 1, b: {}, c: true });
+			model = new Pattern.Model({ a: 1, b: {}, c: true });
 		});
 
 		describe("Getting the value for a key of a defined pair", function () {
@@ -177,7 +138,7 @@ describe("Pattern.Model", function () {
 
 		describe("Getting all values for all keys of defined pairs", function () {
 			it("Gets the defined values", function () {
-				expect(model.getAll()).toEqual({ id: "ID", a: 1, b: {}, c: true });
+				expect(model.getAll()).toEqual({ a: 1, b: {}, c: true });
 			});
 		});
 
@@ -186,7 +147,7 @@ describe("Pattern.Model", function () {
 	describe("Setting values on an instance of the model", function () {
 
 		beforeEach(function () {
-			model = new Pattern.Model({ id: "ID", a: 1, b: {}, c: true });
+			model = new Pattern.Model({ a: 1, b: {}, c: true });
 		});
 
 		describe("Setting the value for a key of a defined pair", function () {
@@ -217,7 +178,7 @@ describe("Pattern.Model", function () {
 		describe("Setting all values for all keys of defined pairs", function () {
 			it("Sets the defined values", function () {
 				expect(model.setAll(null)).toBeUndefined();
-				expect(model.getAll()).toEqual({ id: null, a: null, b: null, c: null });
+				expect(model.getAll()).toEqual({ a: null, b: null, c: null });
 			});
 		});
 
@@ -226,7 +187,7 @@ describe("Pattern.Model", function () {
 	describe("Zedding values on an instance of the model", function () {
 
 		beforeEach(function () {
-			model = new Pattern.Model({ id: "ID", a: 1, b: {}, c: true });
+			model = new Pattern.Model({ a: 1, b: {}, c: true });
 			model.setEach({ "a": 2, "b": null, "c": false, "x": 1 });
 		});
 
@@ -258,7 +219,7 @@ describe("Pattern.Model", function () {
 		describe("Zedding all values for all keys of defined pairs", function () {
 			it("Zeds the defined values", function () {
 				expect(model.zedAll()).toBeUndefined();
-				expect(model.getAll()).toEqual({ id: "ID", a: 1, b: {}, c: true, x: undefined });
+				expect(model.getAll()).toEqual({ a: 1, b: {}, c: true, x: undefined });
 			});
 		});
 
@@ -267,8 +228,8 @@ describe("Pattern.Model", function () {
 	describe("Unsetting values on an instance of the model", function () {
 
 		beforeEach(function () {
-			model = new Pattern.Model({ id: "ID", a: 1, b: {}, c: true });
-			model.setEach({ "id": "Changed ID", "a": 2, "b": null, "c": false, "x": 1 });
+			model = new Pattern.Model({ a: 1, b: {}, c: true });
+			model.setEach({ "a": 2, "b": null, "c": false, "x": 1 });
 		});
 
 		describe("Unsetting the value for a key of a defined pair", function () {
@@ -308,8 +269,8 @@ describe("Pattern.Model", function () {
 	describe("Resetting values on an instance of the model", function () {
 
 		beforeEach(function () {
-			model = new Pattern.Model({ id: "ID", a: 1, b: {}, c: true });
-			model.setEach({ "id": "Changed ID", "a": 2, "b": null, "c": false, "x": 1 });
+			model = new Pattern.Model({ a: 1, b: {}, c: true });
+			model.setEach({ "a": 2, "b": null, "c": false, "x": 1 });
 		});
 
 		describe("Resetting the value for a key of a defined pair", function () {
@@ -340,7 +301,7 @@ describe("Pattern.Model", function () {
 		describe("Resetting all values for all keys of defined pairs", function () {
 			it("Resets the defined values", function () {
 				expect(model.resetAll()).toBeUndefined();
-				expect(model.getAll()).toEqual({ id: "ID", a: 1, b: {}, c: true });
+				expect(model.getAll()).toEqual({ a: 1, b: {}, c: true });
 			});
 		});
 
