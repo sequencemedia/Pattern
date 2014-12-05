@@ -3,6 +3,7 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 	"use strict";
 
 	var pattern,
+		createPID,
 		createUID,
 		Storage,
 		channelStorage,
@@ -17,6 +18,7 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 		viewManager,
 		viewListManager,
 		controllerManager,
+		pid,
 		Model,
 		ModelList,
 		View,
@@ -102,6 +104,17 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 			};
 		}())
 	};
+
+	createPID = (function () {
+		var uidPattern = "nn-n-n-n-nnn",
+			expression = /n/ig;
+		function uid() {
+			return Math.floor((1 + Math.random()) * 0x10000).toString(16).substring(1);
+		}
+		return function () {
+			return uidPattern.replace(expression, uid);
+		};
+	}());
 
 	createUID = (function () {
 		var count = 1e9;
@@ -665,12 +678,12 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 				changedValues[key] = value;
 				currentValues[key] = value;
 			}
-		}
-		if ((parameters || false).constructor === Object) {
-			validators = this.validatorsFor(mid);
-			for (key in parameters) {
-				value = parameters[key];
-				validators[key] = value;
+			if ((parameters || false).constructor === Object) {
+				validators = this.validatorsFor(mid);
+				for (key in parameters) {
+					value = parameters[key];
+					validators[key] = value;
+				}
 			}
 		}
 	};
@@ -1494,13 +1507,13 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 		channelManager.external.broadcast(cid, key, controllerStorage.fetch(cid));
 	};
 	ControllerManager.prototype.queue = function (cid, key, etc) {
-		channelManager.external.queue(cid, key, {
+		channelManager.external.queue(pid, key, { //use pid (these are Pattern events)
 			controller: controllerStorage.fetch(cid),
 			etc: etc
 		});
 	};
 	ControllerManager.prototype.raise = function (cid, key, etc) {
-		channelManager.external.raise(cid, key, {
+		channelManager.external.raise(pid, key, { //use pid (these are Pattern events)
 			controller: controllerStorage.fetch(cid),
 			etc: etc
 		});
@@ -1509,6 +1522,8 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 		controllerStorage.store(cid, controller);
 	};
 	ControllerManager.prototype.discard = function (cid) {
+		channelManager.internal.removeSubscription(cid, pid);
+		channelManager.external.removeSubscription(cid, pid);
 		delete (channelManager.internal.allSubscriptions())[cid];
 		delete (channelManager.external.allSubscriptions())[cid];
 		delete (this.allPredicates())[cid];
@@ -1551,6 +1566,7 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 				}
 			}
 			if ("viewList" in parameters) channelManager.external.createSubscription(cid, lid, parameters.viewList); //controller creating subscription to custom viewList events
+			if ("controller" in parameters) channelManager.external.createSubscription(cid, pid, parameters.controller); //controller creating subscription to custom Pattern events
 		};
 	}());
 	ControllerManager.prototype.ancestor = function (cid, controller) {
@@ -2101,6 +2117,8 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 		}
 	}
 
+	pid = createPID();
+
 	channelStorage = new ChannelStorage();
 
 	modelStorage = new ModelStorage();
@@ -2125,18 +2143,7 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 		ViewList: ViewList,
 		Controller: Controller,
 
-		discard: discard,
-
-		uid: (function () {
-			var uidPattern = "nn-n-n-n-nnn",
-				expression = /n/ig;
-			function uid() {
-				return Math.floor((1 + Math.random()) * 0x10000).toString(16).substring(1);
-			}
-			return function () {
-				return uidPattern.replace(expression, uid);
-			};
-		}())
+		discard: discard
 
 	};
 
