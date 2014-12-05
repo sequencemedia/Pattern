@@ -448,7 +448,7 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 	};
 	ModelManager.prototype.validate = function (mid, key, value) {
 		var validator = (this.validatorsFor(mid))[key];
-		return (validator || false).constructor === Function ? validator(value) : true;
+		return (validator || false).constructor === Function ? validator.call(modelStorage.fetch(mid), value) : true;
 	};
 	ModelManager.prototype.removeCurrentValue = function (mid, key, changed) {
 		(this.changedValuesFor(mid))[key] = changed;
@@ -1392,7 +1392,7 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 		for (i = 0, j = modelList.length; i < j; i = i + 1) {
 			mid = modelList[i];
 			model = allModels[mid];
-			view = new View(model, parameters);
+			view = new View(model); //, parameters);
 			vid = view.vid();
 			viewList.push(vid);
 			viewList[mid] = vid;
@@ -1421,7 +1421,7 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 			var viewList = this.viewListFor(lid),
 				i = 0,
 				j = viewList.length,
-				vid;
+				vid, mid;
 			/*
 				ViewList SUBSCRIBES TO View INTERNAL (DISCARD)
 			*/
@@ -1486,7 +1486,7 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 				i = 0;
 				for (i, j; i < j; i = i + 1) {
 					vid = viewList[i];
-					channelManager.external.createSubscription(lid, vid, parameters.model);
+					if (mid = viewListManager.modelFor(vid)) channelManager.external.createSubscription(vid, mid, parameters.model);
 				}
 			}
 			if ("modelList" in parameters) channelManager.external.createSubscription(lid, uid, parameters.modelList);
