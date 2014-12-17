@@ -306,7 +306,7 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 				return queued;
 			};
 		}
-		Channel.prototype.createSubscription = function (subscriber, publisher, methods) { //console.log(subscriber, publisher, methods);
+		Channel.prototype.createSubscription = function (subscriber, publisher, methods) {
 			var key, subscribers, method;
 			for (key in methods) {
 				if (typeof (method = methods[key]) === "function") {
@@ -468,9 +468,8 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 	ModelManager.prototype.dispose = function (mid, model) {
 		modelStorage.store(mid, model);
 	};
-	ModelManager.prototype.discard = function (mid) { //console.log("ModelManager.prototype.discard()", mid);
+	ModelManager.prototype.discard = function (mid) {
 		channelManager.internal.broadcast(mid, "discard");
-		//console.log("ModelManager.prototype.discard():after", mid);
 		delete (channelManager.internal.allSubscriptions())[mid];
 		delete (channelManager.external.allSubscriptions())[mid];
 		delete (this.allPredicates())[mid];
@@ -694,7 +693,7 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 		var attributes = this.allAttributes();
 		return (attributes[lid] || (attributes[lid] = []));
 	};
-	ModelListManager.prototype.broadcast = function (lid, key, mid) { //console.log("modelListManager.broadcast()", lid, key, mid);
+	ModelListManager.prototype.broadcast = function (lid, key, mid) {
 		channelManager.internal.broadcast(lid, key, mid);
 	};
 	ModelListManager.prototype.queue = function (lid, key, mid) {
@@ -712,9 +711,8 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 	ModelListManager.prototype.dispose = function (lid, modelList) {
 		modelListStorage.store(lid, modelList);
 	};
-	ModelListManager.prototype.discard = function (lid) { //console.log("ModelListManager.prototype.discard()", lid);
+	ModelListManager.prototype.discard = function (lid) {
 		channelManager.internal.broadcast(lid, "discard");
-		//console.log("ModelListManager.prototype.discard():after", lid);
 		delete (channelManager.internal.allSubscriptions())[lid];
 		delete (channelManager.external.allSubscriptions())[lid];
 		delete (this.allPredicates())[lid];
@@ -961,7 +959,7 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 		return (uid) ? this.setPredicateValue(mid, "ancestor", uid) :
 		(uid = this.getPredicateValue(mid, "ancestor")) ? modelListStorage.fetch(uid) : null;
 	};
-	ModelListManager.prototype.initialize = function (lid, pairsList, parameters) { //console.log(lid, pairsList, parameters);
+	ModelListManager.prototype.initialize = function (lid, pairsList, parameters) {
 		var Model,
 			modelList,
 			allModels,
@@ -983,11 +981,11 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 	};
 	ModelListManager.prototype.subscribe = (function () {
 		function discard(lid, mid) {
-			return function () { //console.log("(ModelListManager:Model)discard()", lid, mid); //console.log(lid, mid);
+			return function () {
 				var modelList = viewListManager.modelListFor(lid),
 					i = 0,
 					j = modelList.length;
-				for (i, j; i < j; i = i + 1) { //console.log(i, lid, mid);
+				for (i, j; i < j; i = i + 1) {
 					if (modelList[i] === mid) {
 						modelList.splice(i, 1);
 						channelManager.internal.removeSubscription(lid, mid);
@@ -1023,13 +1021,13 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 			Pattern does not want to decide whether validators passed to the ModelList or the Model constructor have primacy.
 			*/
 			channelManager.internal.createSubscription(lid, lid, {
-				insert: function (mid) { //console.log("(ModelListManager:ModelList)insert()", mid);
+				insert: function (mid) {
 					channelManager.internal.createSubscription(lid, mid, { discard: (discard(lid, mid)) });
 				},
-				delete: function (mid) { //console.log("(ModelListManager:ModelList)delete()", mid);
+				delete: function (mid) {
 					channelManager.internal.removeSubscription(lid, mid);
 				},
-				discard: function () { //console.log("(ModelListManager:ModelList)discard()", lid, lid);
+				discard: function () {
 					channelManager.internal.removeSubscription(lid, lid);
 				}
 			});
@@ -1041,7 +1039,7 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 
 	function ViewManager() {}
 	ViewManager.prototype = new Manager();
-	ViewManager.prototype.modelFor = function (vid) { //console.log(vid);
+	ViewManager.prototype.modelFor = function (vid) {
 		return this.getPredicateValue(vid, "model");
 	};
 	ViewManager.prototype.queue = function (vid, key, etc) {
@@ -1059,11 +1057,10 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 	ViewManager.prototype.dispose = function (vid, view) {
 		viewStorage.store(vid, view);
 	};
-	ViewManager.prototype.discard = function (vid) { //console.log("ViewManager.prototype.discard()", vid);
+	ViewManager.prototype.discard = function (vid) {
 		var mid;
 		channelManager.internal.broadcast(vid, "discard");
-		//console.log("ViewManager.prototype.discard():after", vid);
-		if (mid = (this.allPredicates())[vid]["model"] || null) {
+		if (mid = ((this.allPredicates())[vid] || {})["model"] || null) {
 			channelManager.internal.removeSubscription(vid, mid);
 			channelManager.external.removeSubscription(vid, mid);
 		}
@@ -1083,12 +1080,12 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 		return (mid) ? this.setPredicateValue(vid, "model", mid) :
 		(mid = this.getPredicateValue(vid, "model")) ? modelStorage.fetch(mid) : null;
 	};
-	ViewManager.prototype.subscribe = function (vid, mid, parameters) { //console.log("ViewManager.prototype.subscribe()", vid, mid, parameters);
+	ViewManager.prototype.subscribe = function (vid, mid, parameters) {
 		channelManager.internal.createSubscription(vid, mid, {
-			discard: function () { //console.log("ViewManager.prototype.subscribe():discard()", vid, mid);
+			discard: function () {
 				channelManager.internal.removeSubscription(vid, mid);
 				channelManager.external.removeSubscription(vid, mid);
-				delete (viewManager.allPredicates())[vid]["model"];
+				delete ((viewManager.allPredicates())[vid] || {})["model"];
 			}
 		});
 		if ("model" in parameters) channelManager.external.createSubscription(vid, mid, parameters.model);
@@ -1103,16 +1100,16 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 		var attributes = this.allAttributes();
 		return (attributes[lid] || (attributes[lid] = []));
 	};
-	ViewListManager.prototype.broadcast = function (lid, key, vid) { //console.log("viewListManager.broadcast()", lid, key, vid);
+	ViewListManager.prototype.broadcast = function (lid, key, vid) {
 		channelManager.internal.broadcast(lid, key, vid);
 	};
-	ViewListManager.prototype.queue = function (lid, key, vid) { //console.log("viewListManager.queue()", lid, key, vid);
+	ViewListManager.prototype.queue = function (lid, key, vid) {
 		channelManager.external.queue(lid, key, {
 			viewList: viewListStorage.fetch(lid),
 			view: viewStorage.fetch(vid)
 		});
 	};
-	ViewListManager.prototype.raise = function (lid, key, vid) { //console.log("viewListManager.raise()", lid, key, vid);
+	ViewListManager.prototype.raise = function (lid, key, vid) {
 		channelManager.external.raise(lid, key, {
 			viewList: viewListStorage.fetch(lid),
 			view: viewStorage.fetch(vid)
@@ -1121,11 +1118,10 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 	ViewListManager.prototype.dispose = function (lid, viewList) {
 		viewListStorage.store(lid, viewList);
 	};
-	ViewListManager.prototype.discard = function (lid) { //console.log("ViewListManager.prototype.discard()", lid);
+	ViewListManager.prototype.discard = function (lid) {
 		var uid;
 		channelManager.internal.broadcast(lid, "discard");
-		//console.log("ViewListManager.prototype.discard():after", lid);
-		if (uid = (this.allPredicates())[lid]["modelList"] || null) {
+		if (uid = ((this.allPredicates())[lid] || {})["modelList"] || null) {
 			channelManager.internal.removeSubscription(lid, uid);
 			channelManager.external.removeSubscription(lid, uid);
 		}
@@ -1379,7 +1375,7 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 		return (uid) ? this.setPredicateValue(lid, "modelList", uid) :
 		(uid = this.getPredicateValue(lid, "modelList")) ? modelListStorage.fetch(uid) : null;
 	};
-	ViewListManager.prototype.initialize = function (lid, uid, parameters) {
+	ViewListManager.prototype.initialize = function (lid, uid) { //, parameters) {
 		var viewList = this.viewListFor(lid),
 			modelList = this.modelListFor(uid), //modelList.all();
 			allModels = this.allModels(),
@@ -1400,13 +1396,13 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 	};
 	ViewListManager.prototype.subscribe = (function () {
 		function discard(lid, vid) { //don't bind up "mid" -- get it afresh (model may have been discarded)
-			return function () { //console.log("(ViewListManager:View):discard()", lid, vid);
+			return function () {
 				var viewList = viewListManager.viewListFor(lid),
 					i = 0,
 					j = viewList.length,
 					mid;
 				for (i, j; i < j; i = i + 1) {
-					if (viewList[i] === vid) { //console.log(i, lid, vid);
+					if (viewList[i] === vid) {
 						viewList.splice(i, 1);
 						if (mid = viewListManager.modelFor(vid)) {
 							delete viewList[mid];
@@ -1417,7 +1413,7 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 				}
 			};
 		}
-		return function (lid, uid, parameters) { //console.log("ViewListManager.prototype.subscribe()", lid, uid, parameters);
+		return function (lid, uid, parameters) {
 			var viewList = this.viewListFor(lid),
 				i = 0,
 				j = viewList.length,
@@ -1433,12 +1429,12 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 				ViewList SUBSCRIBES TO ViewList INTERNAL (INSERT, DELETE, DISCARD)
 			*/
 			channelManager.internal.createSubscription(lid, lid, {
-				insert: function (vid) { //console.log("(ViewListManager:ViewList)insert()", vid);
+				insert: function (vid) {
 					var mid;
 					channelManager.internal.createSubscription(lid, vid, { discard: (discard(lid, vid)) });
 					if ("model" in parameters && (mid = viewListManager.modelFor(vid))) channelManager.external.createSubscription(vid, mid, parameters.model);
 				},
-				delete: function (vid) { //console.log("(ViewListManager:ViewList)delete()", vid);
+				delete: function (vid) {
 					var mid;
 					channelManager.internal.removeSubscription(vid, mid);
 					if ("model" in parameters && (mid = viewListManager.modelFor(vid))) channelManager.external.removeSubscription(vid, mid);
@@ -1452,7 +1448,7 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 				ViewList SUBSCRIBES TO ModelList INTERNAL (INSERT, DELETE, DISCARD)
 			*/
 			channelManager.internal.createSubscription(lid, uid, {
-				insert: function (mid) { //console.log("(ViewListManager:ModeList)insert()", mid);
+				insert: function (mid) {
 					var viewList = viewListManager.viewListFor(lid),
 						vid = (new this.View(modelStorage.fetch(mid))).vid();
 					viewList.push(vid);
@@ -1460,7 +1456,7 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 					viewListManager.broadcast(lid, "insert", vid);
 					viewListManager.queue(lid, "add", vid);
 				},
-				delete: function (mid) { //console.log("(ViewListManager:ModeList)delete()", mid);
+				delete: function (mid) {
 					var viewList = viewListManager.viewListFor(lid),
 						vid, i, j;
 					if (vid = viewList[mid]) {
@@ -1479,7 +1475,7 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 				discard: function () {
 					channelManager.internal.removeSubscription(lid, uid);
 					channelManager.external.removeSubscription(lid, uid);
-					delete (viewListManager.allPredicates())[lid]["modelList"];
+					delete ((viewListManager.allPredicates())[lid] || {})["modelList"];
 				}
 			});
 			if ("model" in parameters) {
@@ -1532,7 +1528,7 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 	};
 	ControllerManager.prototype.subscribe = (function () {
 		function discard(cid, vid) {
-			return function () { //console.log("(ControllerManager:View)discard()", cid, vid);
+			return function () {
 				channelManager.internal.removeSubscription(cid, vid);
 				channelManager.external.removeSubscription(cid, vid);
 			};
@@ -1547,13 +1543,13 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 				channelManager.internal.createSubscription(cid, vid, { discard: (discard(cid, vid)) });
 			}
 			channelManager.internal.createSubscription(cid, lid, { //controller subscribes to discard event of the view list
-				insert: function (vid) { //console.log("(ControllerManager:ViewList)insert()", vid); //console.log("A VIEW HAS BEEN INSERTED INTO THE VIEWLIST I SHOULD CREATE A SUBSCRIPTION FROM THE CONTROLLER TO THAT VIEWS'S EVENTS");
+				insert: function (vid) {
 					channelManager.external.createSubscription(cid, vid, parameters.view);
 				},
-				delete: function (vid) { //console.log("(ControllerManager:ViewList)delete()", vid); //controller removing subscription from custom view events (views added to viewList) //console.log("A VIEW HAS BEEN DELETED FROM THE VIEWLIST I SHOULD REMOVE A SUBSCRIPTION FROM THE CONTROLLER TO THAT VIEWS'S EVENTS");
+				delete: function (vid) {
 					channelManager.external.removeSubscription(cid, vid); //, parameters.view);
 				},
-				discard: function () { //console.log("(ControllerManager:ViewList)discard()", cid, lid);
+				discard: function () {
 					channelManager.internal.removeSubscription(cid, lid);
 					channelManager.external.removeSubscription(cid, lid);
 				}
@@ -1677,11 +1673,11 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 					initialize.call(this, pattern.hash.mix(parentPairs, pairs), pattern.hash.mix(parentParameters, parameters));
 				}
 				Model.prototype = surrogate;
-				Model.descendant = (function (Parent, parentPairs, parentParameters) {
+				Model.descendant = (function (Parent) {
 					return function (pairs, parameters) {
 						return child.call(this, Parent, pattern.hash.mix(parentPairs, pairs), pattern.hash.mix(parentParameters, parameters));
 					};
-				}(Model, parentPairs, parentParameters));
+				}(Model));
 				modelManager.discard(surrogate.mid());
 				return pattern.inherit(Parent, Model);
 			}
@@ -1840,7 +1836,7 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 			function child(Parent, parent, parentModel, parentParameters) {
 				var surrogate = new Parent;
 				function View(model, parameters) {
-					initialize.call(this, parent, model || parentModel || parent.model(), parameters || parentParameters);
+					initialize.call(this, parent, model || parentModel, pattern.hash.mix(parentParameters, parameters));
 				}
 				View.prototype = surrogate;
 				View.prototype.ancestor = function () {
@@ -1848,7 +1844,7 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 				};
 				View.prototype.descendant = (function (Parent) {
 					return function (model, parameters) {
-						return child.call(this, Parent, this, model, parameters);
+						return child.call(this, Parent, this, model || parentModel, pattern.hash.mix(parentParameters, parameters));
 					};
 				}(View));
 				viewManager.discard(surrogate.vid());
@@ -1865,12 +1861,12 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 			function child(Parent, parentModel, parentParameters) {
 				var surrogate = new Parent;
 				function View(model, parameters) {
-					initialize.call(this, model || parentModel, parameters || parentParameters);
+					initialize.call(this, model || parentModel, pattern.hash.mix(parentParameters, parameters));
 				}
 				View.prototype = surrogate;
-				View.prototype.descendant = (function (Parent) {
+				View.descendant = (function (Parent) {
 					return function (model, parameters) {
-						return child.call(this, Parent, model, parameters);
+						return child.call(this, Parent, model || parentModel, pattern.hash.mix(parentParameters, parameters));
 					};
 				}(View));
 				viewManager.discard(surrogate.vid());
@@ -1951,7 +1947,7 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 			function child(Parent, parent, parentModelList, parentParameters) {
 				var surrogate = new Parent;
 				function ViewList(modelList, parameters) {
-					initialize.call(this, parent, modelList || parentModelList || parent.modelList(), parameters || parentParameters);
+					initialize.call(this, parent, modelList || parentModelList, pattern.hash.mix(parentParameters, parameters));
 				}
 				ViewList.prototype = surrogate;
 				ViewList.prototype.ancestor = function () {
@@ -1959,7 +1955,7 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 				};
 				ViewList.prototype.descendant = (function (Parent) {
 					return function (modelList, parameters) {
-						return child.call(this, Parent, this, modelList, parameters);
+						return child.call(this, Parent, this, modelList || parentModelList, pattern.hash.mix(parentParameters, parameters));
 					};
 				}(ViewList));
 				viewListManager.discard(surrogate.lid());
@@ -1976,12 +1972,12 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 			function child(Parent, parentModelList, parentParameters) {
 				var surrogate = new Parent;
 				function ViewList(modelList, parameters) {
-					initialize.call(this, modelList || parentModelList, parameters || parentParameters);
+					initialize.call(this, modelList || parentModelList, pattern.hash.mix(parentParameters, parameters));
 				}
 				ViewList.prototype = surrogate;
-				ViewList.prototype.descendant = (function (Parent) {
+				ViewList.descendant = (function (Parent) {
 					return function (modelList, parameters) {
-						return child.call(this, Parent, modelList, parameters);
+						return child.call(this, Parent, modelList || parentModelList, pattern.hash.mix(parentParameters, parameters));
 					};
 				}(ViewList));
 				viewListManager.discard(surrogate.lid());
@@ -2036,7 +2032,7 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 			function child(Parent, parent, parentViewList, parentParameters) {
 				var surrogate = new Parent;
 				function Controller(viewList, parameters) {
-					initialize.call(this, parent, viewList || parentViewList || parent.viewList(), parameters || parentParameters);
+					initialize.call(this, parent, viewList || parentViewList, pattern.hash.mix(parentParameters, parameters));
 				}
 				Controller.prototype = surrogate;
 				Controller.prototype.ancestor = function () {
@@ -2044,7 +2040,7 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 				};
 				Controller.prototype.descendant = (function (Parent) {
 					return function (viewList, parameters) {
-						return child.call(this, Parent, this, viewList, parameters);
+						return child.call(this, Parent, this, viewList || parentViewList, pattern.hash.mix(parentParameters, parameters));
 					};
 				}(Controller));
 				controllerManager.discard(surrogate.cid());
@@ -2061,12 +2057,12 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 			function child(Parent, parentViewList, parentParameters) {
 				var surrogate = new Parent;
 				function Controller(viewList, parameters) {
-					initialize.call(this, viewList || parentViewList, parameters || parentParameters);
+					initialize.call(this, viewList || parentViewList, pattern.hash.mix(parentParameters, parameters));
 				}
 				Controller.prototype = surrogate;
-				Controller.prototype.descendant = (function (Parent) {
+				Controller.descendant = (function (Parent) {
 					return function (viewList, parameters) {
-						return child.call(this, Parent, viewList, parameters);
+						return child.call(this, Parent, viewList || parentViewList, pattern.hash.mix(parentParameters, parameters));
 					};
 				}(Controller));
 				controllerManager.discard(surrogate.cid());
