@@ -1759,7 +1759,12 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 				};
 				ModelList.prototype.descendant = (function (Parent) {
 					return function (pairsList, parameters) {
-						return child.call(this, Parent, this, pattern.list.mix(parentPairs, pairsList), pattern.hash.mix(parentParameters, parameters));
+						/*
+							Model instances of this descendant will be appended to the list of Model instances of its ancestor
+							(necessarily being a list from all this descendants ancestors) so mixing-in the list here just
+							creates duplicate Model instances
+						*/
+						return child.call(this, Parent, this, pairsList || parentPairs, pattern.hash.mix(parentParameters, parameters));
 					};
 				}(ModelList));
 				modelListManager.discard(surrogate.lid());
@@ -1947,7 +1952,7 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 			function child(Parent, parent, parentModelList, parentParameters) {
 				var surrogate = new Parent;
 				function ViewList(modelList, parameters) {
-					initialize.call(this, parent, modelList || parentModelList, pattern.hash.mix(parentParameters, parameters));
+					initialize.call(this, parent, pattern.list.mix(parentModelList, modelList), pattern.hash.mix(parentParameters, parameters));
 				}
 				ViewList.prototype = surrogate;
 				ViewList.prototype.ancestor = function () {
@@ -1972,12 +1977,12 @@ var Pattern = (function () { /* jshint forin: false, maxerr: 1000 */
 			function child(Parent, parentModelList, parentParameters) {
 				var surrogate = new Parent;
 				function ViewList(modelList, parameters) {
-					initialize.call(this, modelList || parentModelList, pattern.hash.mix(parentParameters, parameters));
+					initialize.call(this, pattern.list.mix(parentModelList, modelList), pattern.hash.mix(parentParameters, parameters));
 				}
 				ViewList.prototype = surrogate;
 				ViewList.descendant = (function (Parent) {
 					return function (modelList, parameters) {
-						return child.call(this, Parent, modelList || parentModelList, pattern.hash.mix(parentParameters, parameters));
+						return child.call(this, Parent, pattern.list.mix(parentModelList, modelList), pattern.hash.mix(parentParameters, parameters));
 					};
 				}(ViewList));
 				viewListManager.discard(surrogate.lid());
