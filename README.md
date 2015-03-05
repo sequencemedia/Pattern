@@ -1,4 +1,4 @@
 Pattern
 =======
 
-Another MVC library
+An MVC library.
