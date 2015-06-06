@@ -1,0 +1,9 @@
+node_modules
+assets/css/*
+assets/js/app/*
+assets/js/lib/*
+assets/js/vendor/modernizr.js
+views/*
+*.html
+package.json
+app.js
