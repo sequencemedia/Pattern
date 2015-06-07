@@ -12,6 +12,9 @@ define(['pattern/storage'], function (Storage) {
 			this.hasController = function (cid) {
 				return (cid in controllers);
 			};
+			this.controllerFor = function (cid) {
+				return controllers[cid] || null;
+			};
 		}
 		return function ControllerStorage() { /* console.log('(ControllerStorage)'); */
 			return instance || initialize.call(instance = this);

@@ -76,7 +76,7 @@ define(function () {
 			};
 		}()),
 		createPID: (function () {
-			var uidPattern = "nn-n-n-n-nnn",
+			var uidPattern = 'nn-n-n-n-nnn',
 				expression = /n/ig;
 			function uid() {
 				return Math.floor((1 + Math.random()) * 0x10000).toString(16).substring(1);
@@ -91,10 +91,10 @@ define(function () {
 				return (count = count + 1).toString(16);
 			};
 		}()),
-		createLID: function (uid) { return "lid-" + uid; },
-		createMID: function (uid) { return "mid-" + uid; },
-		createVID: function (uid) { return "vid-" + uid; },
-		createCID: function (uid) { return "cid-" + uid; }
+		createLID: function (uid) { return 'lid-' + uid; },
+		createMID: function (uid) { return 'mid-' + uid; },
+		createVID: function (uid) { return 'vid-' + uid; },
+		createCID: function (uid) { return 'cid-' + uid; }
 	};
 
 });

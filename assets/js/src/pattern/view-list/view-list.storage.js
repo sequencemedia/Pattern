@@ -12,6 +12,9 @@ define(['pattern/storage'], function (Storage) {
 			this.hasViewList = function (lid) {
 				return (lid in viewLists);
 			};
+			this.viewListFor = function (lid) {
+				return viewLists[lid] || null;
+			};
 		};
 		return function ViewListStorage() { /* console.log('(ViewListStorage)'); */
 			return instance || initialize.call(instance = this);

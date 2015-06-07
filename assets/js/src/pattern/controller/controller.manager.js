@@ -17,10 +17,13 @@ define(['pattern/pattern', 'pattern/view/view.storage', 'pattern/view-list/view-
 		}());
 
 	ControllerManager.prototype = new Manager();
+	ControllerManager.prototype.allViews = function () { //controllerManager -> viewManager -> viewStorage.allViews()
+		return viewManager.allViews();
+	};
 	ControllerManager.prototype.hasView = function (vid) { //controllerManager -> viewManager -> viewStorage.hasView()
 		return viewManager.hasView(vid);
 	};
-	ControllerManager.prototype.viewFor = function (vid) { //controllerManager -> viewManager -> viewStorage.hasView()
+	ControllerManager.prototype.viewFor = function (vid) { //controllerManager -> viewManager -> viewStorage.viewFor()
 		return viewManager.viewFor(vid);
 	};
 	ControllerManager.prototype.view = function (cid, view) {
@@ -28,11 +31,23 @@ define(['pattern/pattern', 'pattern/view/view.storage', 'pattern/view-list/view-
 		return (uid) ? this.setPredicateValue(cid, 'view', uid) :
 		(uid = this.getPredicateValue(cid, 'view')) ? viewStorage.fetch(uid) : null;
 	};
+	ControllerManager.prototype.allViewLists = function () { //controllerManager -> viewListManager -> viewListStorage.allViewLists()
+		return viewListManager.allViewLists();
+	};
 	ControllerManager.prototype.hasViewList = function (lid) { //controllerManager -> viewListManager -> viewListStorage.hasViewList()
 		return viewListManager.hasViewList(lid);
 	};
 	ControllerManager.prototype.viewListFor = function (lid) { //controllerManager -> viewListManager -> viewListStorage.viewListFor()
 		return viewListManager.viewListFor(lid);
+	};
+	ControllerManager.prototype.allControllers = function () {
+		return controllerStorage.allControllers();
+	};
+	ControllerManager.prototype.hasController = function (cid) {
+		return controllerStorage.hasController(cid);
+	};
+	ControllerManager.prototype.controllerFor = function (cid) {
+		return controllerStorage.controllerFor(cid);
 	};
 	ControllerManager.prototype.viewList = function (cid, viewList) {
 		var uid = (viewList instanceof ViewList) ? viewList.lid() : null;
@@ -101,8 +116,7 @@ define(['pattern/pattern', 'pattern/view/view.storage', 'pattern/view-list/view-
 					channelManager.external.createSubscription(cid, vid, parameters.view);
 				}
 			}
-			if ('view' in parameters) channelManager.external.createSubscription(cid, lid, parameters.viewList)
-			else if ('viewList' in parameters) channelManager.external.createSubscription(cid, lid, parameters.viewList); //controller creating subscription to custom viewList events
+			if ('viewList' in parameters) channelManager.external.createSubscription(cid, lid, parameters.viewList); //controller creating subscription to custom viewList events
 			if ('controller' in parameters) channelManager.external.createSubscription(cid, pid, parameters.controller); //controller creating subscription to custom Pattern events
 		};
 	}());

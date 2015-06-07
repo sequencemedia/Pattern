@@ -94,6 +94,15 @@ define(['pattern/pattern', 'pattern/model/model.manager'], function (pattern, Mo
 			return child.call(this, Parent, this, pairs, parameters);
 		};
 	}(Model));
+	Model.discard = function () {
+		var mid,
+			allModels = modelManager.allModels(),
+			model;
+		for (mid in allModels) {
+			model = allModels[mid];
+			model.discard();
+		}
+	};
 	Model.descendant = (function (Parent) {
 		function initialize(pairs, parameters) {
 			this.constructor.call(this, pairs, parameters);

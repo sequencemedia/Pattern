@@ -12,6 +12,9 @@ define(['pattern/storage'], function (Storage) {
 			this.hasView = function (vid) {
 				return (vid in views);
 			};
+			this.viewFor = function (vid) {
+				return views[vid] || null;
+			};
 		}
 		return function ViewStorage() { //console.log('(ViewStorage)');
 			return instance || initialize.call(instance = this);

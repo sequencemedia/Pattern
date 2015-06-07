@@ -14,13 +14,22 @@ define(['pattern/model/model.storage', 'pattern/model-list/model-list.storage', 
 		}());
 
 	ModelListManager.prototype = new Manager();
-	ModelListManager.prototype.allModels = function () {
+	ModelListManager.prototype.allModels = function () { //modelListManager -> modelManager -> modelStorage.allModels()
 		return modelManager.allModels();
+	};
+	ModelListManager.prototype.hasModel = function (mid) { //modelListManager -> modelManager -> modelStorage.allModels()
+		return modelManager.hasModels(mid);
+	};
+	ModelListManager.prototype.modelFor = function (mid) { //modelListManager -> modelManager -> modelStorage.allModels()
+		return modelManager.modelFor(mid);
+	};
+	ModelListManager.prototype.allModelLists = function () { //modelListManager -> modelListStorage.allModelLists()
+		return modelListStorage.allModelLists();
 	};
 	ModelListManager.prototype.hasModelList = function (lid) { //modelListManager -> modelListStorage.hasModelList()
 		return modelListStorage.hasModelList(lid);
 	};
-	ModelListManager.prototype.modelListFor = function (lid) {
+	ModelListManager.prototype.modelListFor = function (lid) { //lists of instances
 		var attributes = this.allAttributes();
 		return (attributes[lid] || (attributes[lid] = []));
 	};
@@ -43,7 +52,7 @@ define(['pattern/model/model.storage', 'pattern/model-list/model-list.storage', 
 		modelListStorage.store(lid, modelList);
 	};
 	ModelListManager.prototype.discard = function (lid) {
-		channelManager.internal.broadcast(lid, "discard");
+		channelManager.internal.broadcast(lid, 'discard');
 		delete (channelManager.internal.allSubscriptions())[lid];
 		delete (channelManager.external.allSubscriptions())[lid];
 		delete (this.allPredicates())[lid];
@@ -57,7 +66,7 @@ define(['pattern/model/model.storage', 'pattern/model-list/model-list.storage', 
 			lowerBound,
 			mid;
 		if (modelListStorage.hasModelList(lid)) {
-			if (typeof index === "number") {
+			if (typeof index === 'number') {
 				modelList = this.modelListFor(lid);
 				i = 0;
 				j = modelList.length;
@@ -80,7 +89,7 @@ define(['pattern/model/model.storage', 'pattern/model-list/model-list.storage', 
 			lowerBound,
 			mid;
 		if (modelListStorage.hasModelList(lid)) {
-			if (typeof index === "number" && model instanceof Model) {
+			if (typeof index === 'number' && model instanceof Model) {
 				if (modelStorage.hasModel(mid = model.mid())) {
 					modelList = this.modelListFor(lid);
 					i = 0;
@@ -120,8 +129,8 @@ define(['pattern/model/model.storage', 'pattern/model-list/model-list.storage', 
 						} while (++i < j);
 					}
 					modelList.push(mid);
-					this.broadcast(lid, "insert", mid);
-					this.raise(lid, "add", mid);
+					this.broadcast(lid, 'insert', mid);
+					this.raise(lid, 'add', mid);
 				}
 			}
 		}
@@ -146,8 +155,8 @@ define(['pattern/model/model.storage', 'pattern/model-list/model-list.storage', 
 								m = modelList.length;
 								if (n === m) {
 									modelList.push(mid);
-									this.broadcast(lid, "insert", mid);
-									this.raise(lid, "add", mid);
+									this.broadcast(lid, 'insert', mid);
+									this.raise(lid, 'add', mid);
 								} else {
 									do {
 										if (modelList[n] === mid) {
@@ -156,8 +165,8 @@ define(['pattern/model/model.storage', 'pattern/model-list/model-list.storage', 
 									} while (++n < m);
 									if (n === m) {
 										modelList.push(mid);
-										this.broadcast(lid, "insert", mid);
-										this.raise(lid, "add", mid);
+										this.broadcast(lid, 'insert', mid);
+										this.raise(lid, 'add', mid);
 									}
 								}
 							}
@@ -181,8 +190,8 @@ define(['pattern/model/model.storage', 'pattern/model-list/model-list.storage', 
 						do {
 							if (modelList[i] === mid) {
 								modelList.splice(i, 1);
-								this.broadcast(lid, "delete", mid);
-								this.raise(lid, "remove", mid);
+								this.broadcast(lid, 'delete', mid);
+								this.raise(lid, 'remove', mid);
 								break;
 							}
 						} while (++i < j);
@@ -213,8 +222,8 @@ define(['pattern/model/model.storage', 'pattern/model-list/model-list.storage', 
 									do {
 										if (modelList[n] === mid) {
 											modelList.splice(n, 1);
-											this.broadcast(lid, "delete", mid);
-											this.raise(lid, "remove", mid);
+											this.broadcast(lid, 'delete', mid);
+											this.raise(lid, 'remove', mid);
 											break;
 										}
 									} while (++n < m);
@@ -287,8 +296,8 @@ define(['pattern/model/model.storage', 'pattern/model-list/model-list.storage', 
 	};
 	ModelListManager.prototype.ancestor = function (mid, modelList) {
 		var uid = (modelList instanceof ModelList) ? modelList.lid() : null;
-		return (uid) ? this.setPredicateValue(mid, "ancestor", uid) :
-		(uid = this.getPredicateValue(mid, "ancestor")) ? modelListStorage.fetch(uid) : null;
+		return (uid) ? this.setPredicateValue(mid, 'ancestor', uid) :
+		(uid = this.getPredicateValue(mid, 'ancestor')) ? modelListStorage.fetch(uid) : null;
 	};
 	ModelListManager.prototype.initialize = function (lid, pairsList, parameters) {
 		var Model,
@@ -311,13 +320,22 @@ define(['pattern/model/model.storage', 'pattern/model-list/model-list.storage', 
 		}
 	};
 	ModelListManager.prototype.subscribe = (function () {
-		function discard(lid, mid) {
-			return function () {
-				var modelList = viewListManager.modelListFor(lid),
+		function discard(modelListManager, lid, mid) {
+			return function () { //console.log('modelListManager', modelListManager, lid, mid);
+				/*
+				Get the list of model instances for this modelList
+				*/
+				var modelList = modelListManager.modelListFor(lid),
 					i = 0,
 					j = modelList.length;
 				for (i, j; i < j; i = i + 1) {
+					/*
+					Find the model instance in this modelList
+					*/
 					if (modelList[i] === mid) {
+						/*
+						Remove this model instance from this modelList
+						*/
 						modelList.splice(i, 1);
 						channelManager.internal.removeSubscription(lid, mid);
 						break;
@@ -332,17 +350,17 @@ define(['pattern/model/model.storage', 'pattern/model-list/model-list.storage', 
 				mid;
 			for (i, j; i < j; i = i + 1) {
 				mid = modelList[i];
-				channelManager.internal.createSubscription(lid, mid, { discard: (discard(lid, mid)) });
+				channelManager.internal.createSubscription(lid, mid, { discard: (discard(this, lid, mid)) });
 			}
 			/*
-			Models with validators are instantiated from the values passed in the "pairsList" and "parameters" arguments of the
+			Models with validators are instantiated from the values passed in the 'pairsList' and 'parameters' arguments of the
 			ModelList constructor. All of the Models instantiated when the the ModelList is instantiated will use the
-			validators in the "parameters" argument.
+			validators in the 'parameters' argument.
 
 				var modelList = new Pattern.ModelList([{ id: 1 }], { id: function (v) { return v > 1; } }); // creates a model list with a model having a validator
 
-			The "add" and "remove" methods of the ModelList only accept Model instances which could or should have had validators
-			passed in the "parameters" argument of the Model constructor.
+			The 'add' and 'remove' methods of the ModelList only accept Model instances which could or should have had validators
+			passed in the 'parameters' argument of the Model constructor.
 
 				var model = new Pattern.Model({ id: 2 }, { id: function (v) { return v > 2; } }); // creates a model having a validator
 
@@ -353,7 +371,7 @@ define(['pattern/model/model.storage', 'pattern/model-list/model-list.storage', 
 			*/
 			channelManager.internal.createSubscription(lid, lid, {
 				insert: function (mid) {
-					channelManager.internal.createSubscription(lid, mid, { discard: (discard(lid, mid)) });
+					channelManager.internal.createSubscription(lid, mid, { discard: (discard(this, lid, mid)) });
 				},
 				delete: function (mid) {
 					channelManager.internal.removeSubscription(lid, mid);

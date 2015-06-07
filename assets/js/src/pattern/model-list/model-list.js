@@ -86,6 +86,15 @@ define(['pattern/pattern', 'pattern/model-list/model-list.manager', 'pattern/mod
 			return child.call(this, Parent, this, pairsList, parameters);
 		};
 	}(ModelList));
+	ModelList.discard = function () {
+		var lid,
+			allModelLists = modelListManager.allModelLists(),
+			modelList;
+		for (lid in allModelLists) {
+			modelList = allModelLists[lid];
+			modelList.discard();
+		}
+	};
 	ModelList.descendant = (function (Parent) {
 		function initialize(pairsList, parameters) {
 			this.constructor.call(this, pairsList, parameters);

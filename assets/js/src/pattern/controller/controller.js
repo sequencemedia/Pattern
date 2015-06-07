@@ -69,6 +69,15 @@ define(['pattern/pattern', 'pattern/controller/controller.manager', 'pattern/vie
 			return child.call(this, Parent, this, viewList, parameters);
 		};
 	}(Controller));
+	Controller.discard = function () {
+		var cid,
+			allControllers = controllerManager.allControllers(),
+			controller;
+		for (cid in allControllers) {
+			controller = allControllers[cid];
+			controller.discard();
+		}
+	};
 	Controller.descendant = (function (Parent) {
 		function initialize(viewList, parameters) {
 			this.constructor.call(this, viewList, parameters); //ancestor.constructor.call(this, viewList, parameters);

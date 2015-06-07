@@ -13,14 +13,23 @@ define(['pattern/view/view.storage', 'pattern/manager', 'pattern/channel/channel
 		}());
 
 	ViewManager.prototype = new Manager();
+	ViewManager.prototype.allModels = function () { //viewManager -> modelManager -> modelStorage.allModels()
+		return modelManager.allModels();
+	};
 	ViewManager.prototype.hasModel = function (mid) { //viewManager -> modelManager -> modelStorage.hasModel()
 		return modelManager.hasModel(mid);
+	};
+	ViewManager.prototype.modelFor = function (vid) {
+		return this.getPredicateValue(vid, 'model');
+	};
+	ViewManager.prototype.allViews = function () { //viewManager -> viewStorage.allViews()
+		return viewStorage.allViews();
 	};
 	ViewManager.prototype.hasView = function (vid) { //viewManager -> viewStorage.hasView()
 		return viewStorage.hasView(vid);
 	};
-	ViewManager.prototype.modelFor = function (vid) {
-		return this.getPredicateValue(vid, 'model');
+	ViewManager.prototype.viewFor = function (vid) { //viewManager -> viewStorage.viewFor()
+		return viewStorage.viewFor(vid);
 	};
 	ViewManager.prototype.queue = function (vid, key, etc) {
 		channelManager.external.queue(vid, key, {
@@ -61,6 +70,7 @@ define(['pattern/view/view.storage', 'pattern/manager', 'pattern/channel/channel
 		(mid = this.getPredicateValue(vid, 'model')) ? modelStorage.fetch(mid) : null;
 	};
 	ViewManager.prototype.subscribe = function (vid, mid, parameters) {
+		var viewManager = this;
 		channelManager.internal.createSubscription(vid, mid, {
 			discard: function () {
 				channelManager.internal.removeSubscription(vid, mid);

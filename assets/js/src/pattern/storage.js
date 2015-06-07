@@ -3,7 +3,7 @@ define(function () {
 	'use strict';
 
 	/*
-	"all" is static (accessible by all instances) not private (accessible by an instance)
+	'all' is static (accessible by all instances) not private (accessible by an instance)
 	*/
 
 	var Storage = (function () {

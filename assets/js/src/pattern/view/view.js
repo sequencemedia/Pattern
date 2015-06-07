@@ -61,6 +61,15 @@ define(['pattern/pattern', 'pattern/view/view.manager', 'pattern/model/model'], 
 			return child.call(this, Parent, this, model, parameters);
 		};
 	}(View));
+	View.discard = function () {
+		var vid,
+			allViews = viewManager.allViews(),
+			view;
+		for (vid in allViews) {
+			view = allViews[vid];
+			view.discard();
+		}
+	};
 	View.descendant = (function (Parent) {
 		function initialize(model, parameters) {
 			this.constructor.call(this, model, parameters); //ancestor.constructor.call(this, model, parameters);

@@ -87,6 +87,15 @@ define(['pattern/pattern', 'pattern/view-list/view-list.manager', 'pattern/view/
 			return child.call(this, Parent, this, modelList, parameters);
 		};
 	}(ViewList));
+	ViewList.discard = function () {
+		var lid,
+			allViewLists = viewListManager.allViewLists(),
+			viewList;
+		for (lid in allViewLists) {
+			viewList = allViewLists[lid];
+			viewList.discard();
+		}
+	};
 	ViewList.descendant = (function (Parent) {
 		function initialize(modelList, parameters) {
 			this.constructor.call(this, modelList, parameters); //ancestor.constructor.call(this, modelList, parameters);

@@ -12,6 +12,9 @@ define(['pattern/storage'], function (Storage) {
 			this.hasModel = function (mid) {
 				return (mid in models);
 			};
+			this.modelFor = function (mid) {
+				return models[mid] || null;
+			};
 		}
 		return function ModelStorage() { /* console.log('(ModelStorage)'); */
 			return instance || initialize.call(instance = this);

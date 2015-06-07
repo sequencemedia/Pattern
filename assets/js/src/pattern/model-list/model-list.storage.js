@@ -12,6 +12,9 @@ define(['pattern/storage'], function (Storage) {
 			this.hasModelList = function (lid) {
 				return (lid in modelLists);
 			};
+			this.modelListFor = function (lid) {
+				return modelLists[lid] || null;
+			};
 		}
 		return function ModelListStorage() { /* console.log('(ModelListStorage)'); */
 			return instance || initialize.call(instance = this);

@@ -6,7 +6,7 @@ define(['pattern/model/model.storage', 'pattern/manager', 'pattern/channel/chann
 		channelManager = new ChannelManager,
 		ModelManager = (function () {
 			var instance;
-			function initialize() { /* console.log("(ModelManager)[initialize]"); */
+			function initialize() { /* console.log('(ModelManager)[initialize]'); */
 				var defaultAttributes = {},
 					changedAttributes = {},
 					currentAttributes = {},
@@ -24,7 +24,7 @@ define(['pattern/model/model.storage', 'pattern/manager', 'pattern/channel/chann
 					return validators;
 				};
 			}
-			return function ModelManager() { /* console.log("(ModelManager)"); */
+			return function ModelManager() { /* console.log('(ModelManager)'); */
 				return instance || initialize.call(instance = this);
 			}
 		}());
@@ -35,6 +35,9 @@ define(['pattern/model/model.storage', 'pattern/manager', 'pattern/channel/chann
 	};
 	ModelManager.prototype.hasModel = function (mid) { //viewManager -> modelListManager.hasModel()
 		return modelStorage.hasModel(mid);
+	};
+	ModelManager.prototype.modelFor = function (mid) { //viewManager -> modelListManager.modelFor()
+		return modelStorage.modelFor(mid);
 	};
 	ModelManager.prototype.defaultValuesFor = function (mid) {
 		var defaultAttributes = this.allDefaultAttributes();
@@ -111,7 +114,7 @@ define(['pattern/model/model.storage', 'pattern/manager', 'pattern/channel/chann
 		modelStorage.store(mid, model);
 	};
 	ModelManager.prototype.discard = function (mid) {
-		channelManager.internal.broadcast(mid, "discard");
+		channelManager.internal.broadcast(mid, 'discard');
 		delete (channelManager.internal.allSubscriptions())[mid];
 		delete (channelManager.external.allSubscriptions())[mid];
 		delete (this.allPredicates())[mid];
@@ -300,8 +303,8 @@ define(['pattern/model/model.storage', 'pattern/manager', 'pattern/channel/chann
 	}());
 	ModelManager.prototype.ancestor = function (mid, model) {
 		var uid = (model instanceof Model) ? model.mid() : null;
-		return (uid) ? this.setPredicateValue(mid, "ancestor", uid) :
-		(uid = this.getPredicateValue(mid, "ancestor")) ? modelStorage.fetch(uid) : null;
+		return (uid) ? this.setPredicateValue(mid, 'ancestor', uid) :
+		(uid = this.getPredicateValue(mid, 'ancestor')) ? modelStorage.fetch(uid) : null;
 	};
 	ModelManager.prototype.initialize = function (mid, pairs, parameters) {
 		var key, value,

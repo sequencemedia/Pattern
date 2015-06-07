@@ -3,7 +3,7 @@ define(function () {
 	'use strict';
 
 	/*
-	"attributes" and "predicates" are private
+	'attributes' and 'predicates' are private
 	*/
 
 	function Manager() {
