@@ -2,38 +2,23 @@ define(['pattern/pattern', 'pattern/controller/controller.manager', 'pattern/vie
 
 	'use strict';
 
-	var controllerManager = new ControllerManager;
+	var controllerManager = new ControllerManager,
+		ViewController,
+		ViewListController;
 
 	function initialize(parameter, parameters) { //parameter, parameters
-		var cid, uid;
+		var cid;
 		this.cid = (function (cid) {
 			return function () {
 				return cid;
 			};
 		}(cid = pattern.createCID(pattern.createUID())));
 		controllerManager.dispose(cid, this);
-		if (parameter instanceof View) {
-			if (controllerManager.hasView(uid = parameter.vid())) {
-				controllerManager.view(cid, parameter);
-				controllerManager.subscribe(cid, uid, parameters || (parameters = {}));
-			}
-		} else if (parameter instanceof ViewList) {
-			if (controllerManager.hasViewList(uid = parameter.lid())) {
-				controllerManager.viewList(cid, parameter);
-				controllerManager.subscribe(cid, uid, parameters || (parameters = {}));
-			}
-		}
 	}
 
 	function Controller(parameter, parameters) {
-		initialize.call(this, parameter, parameters);
+		return (parameter instanceof View) ? new ViewController(parameter, parameters) : (parameter instanceof ViewList) ? new ViewListController(parameter, parameters) : initialize.call(this, parameter, parameters);
 	}
-	Controller.prototype.view = function (view) {
-		return controllerManager.view(this.cid(), view);
-	};
-	Controller.prototype.viewList = function (viewList) {
-		return controllerManager.viewList(this.cid(), viewList);
-	};
 	Controller.prototype.queue = function (key, parameters) {
 		controllerManager.queue(this.cid(), key, parameters);
 	};
@@ -44,29 +29,29 @@ define(['pattern/pattern', 'pattern/controller/controller.manager', 'pattern/vie
 		controllerManager.discard(this.cid());
 	};
 	Controller.prototype.descendant = (function (Parent) {
-		function initialize(ancestor, viewList, parameters) {
-			this.constructor.call(this, viewList, parameters); //ancestor.constructor.call(this, viewList, parameters);
+		function initialize(ancestor, parameter, parameters) {
+			this.constructor.call(this, parameter, parameters); //ancestor.constructor.call(this, parameter, parameters);
 			controllerManager.ancestor(this.cid(), ancestor);
 		}
-		function child(Parent, parent, parentViewList, parentParameters) {
+		function child(Parent, parent, parentParameter, parentParameters) {
 			var surrogate = new Parent;
-			function Controller(viewList, parameters) {
-				initialize.call(this, parent, viewList || parentViewList, pattern.hash.mix(parentParameters, parameters));
+			function Controller(parameter, parameters) {
+				initialize.call(this, parent, parameter || parentParameter, pattern.hash.mix(parentParameters, parameters));
 			}
 			Controller.prototype = surrogate;
 			Controller.prototype.ancestor = function () {
 				return controllerManager.ancestor(this.cid());
 			};
 			Controller.prototype.descendant = (function (Parent) {
-				return function (viewList, parameters) {
-					return child.call(this, Parent, this, viewList || parentViewList, pattern.hash.mix(parentParameters, parameters));
+				return function (parameter, parameters) {
+					return child.call(this, Parent, this, parameter || parentParameter, pattern.hash.mix(parentParameters, parameters));
 				};
 			}(Controller));
 			controllerManager.discard(surrogate.cid());
 			return pattern.inherit(Parent, Controller);
 		}
-		return function (viewList, parameters) {
-			return child.call(this, Parent, this, viewList, parameters);
+		return function (parameter, parameters) {
+			return child.call(this, Parent, this, parameter, parameters);
 		};
 	}(Controller));
 	Controller.discard = function () {
@@ -79,26 +64,62 @@ define(['pattern/pattern', 'pattern/controller/controller.manager', 'pattern/vie
 		}
 	};
 	Controller.descendant = (function (Parent) {
-		function initialize(viewList, parameters) {
-			this.constructor.call(this, viewList, parameters); //ancestor.constructor.call(this, viewList, parameters);
+		function initialize(parameter, parameters) {
+			this.constructor.call(this, parameter, parameters); //ancestor.constructor.call(this, parameter, parameters);
 		}
-		function child(Parent, parentViewList, parentParameters) {
+		function child(Parent, parentParameter, parentParameters) {
 			var surrogate = new Parent;
-			function Controller(viewList, parameters) {
-				initialize.call(this, viewList || parentViewList, pattern.hash.mix(parentParameters, parameters));
+			function Controller(parameter, parameters) {
+				initialize.call(this, parameter || parentParameter, pattern.hash.mix(parentParameters, parameters));
 			}
 			Controller.prototype = surrogate;
 			Controller.descendant = (function (Parent) {
-				return function (viewList, parameters) {
-					return child.call(this, Parent, viewList || parentViewList, pattern.hash.mix(parentParameters, parameters));
+				return function (parameter, parameters) {
+					return child.call(this, Parent, parameter || parentParameter, pattern.hash.mix(parentParameters, parameters));
 				};
 			}(Controller));
 			controllerManager.discard(surrogate.cid());
 			return pattern.inherit(Parent, Controller);
 		}
-		return function (viewList, parameters) {
-			return child.call(this, Parent, viewList, parameters);
+		return function (parameter, parameters) {
+			return child.call(this, Parent, parameter, parameters);
 		};
+	}(Controller));
+
+	ViewController = (function (Parent) {
+		var surrogate = new Parent;
+		function Controller(parameter, parameters) {
+			var vid, cid;
+			initialize.call(this, parameter, parameters);
+			if (controllerManager.hasView(vid = parameter.vid())) {
+				controllerManager.view(cid = this.cid(), parameter);
+				controllerManager.subscribe(cid, vid, parameters || (parameters = {}));
+			}
+		}
+		Controller.prototype = surrogate;
+		Controller.prototype.view = function (view) {
+			return controllerManager.view(this.cid(), view);
+		}
+		controllerManager.discard(surrogate.cid());
+		return pattern.inherit(Parent, Controller);
+	}(Controller));
+
+	ViewListController = (function (Parent) {
+		var surrogate = new Parent;
+		function Controller(parameter, parameters) {
+			var lid, cid;
+			initialize.call(this, parameter, parameters);
+			if (controllerManager.hasViewList(lid = parameter.lid())) {
+				controllerManager.viewList(cid = this.cid(), parameter);
+				controllerManager.subscribe(cid, lid, parameters || (parameters = {}));
+			}
+		}
+		Controller.prototype = surrogate;
+		Controller.prototype.viewList = function (viewList) {
+			return controllerManager.viewList(this.cid(), viewList);
+		};
+		controllerManager.discard(surrogate.cid());
+		return pattern.inherit(Parent, Controller);
 	}(Controller));
 
 	return Controller;
