@@ -20,7 +20,7 @@ define(['pattern/channel/channel.storage', 'pattern/manager'], function (Channel
 				Channel.prototype.createSubscription = function (subscriber, publisher, methods) {
 					var key, subscribers, method;
 					for (key in methods) {
-						if (typeof (method = methods[key]) === "function") {
+						if (typeof (method = methods[key]) === 'function') {
 							subscribers = this.subscribersFor(publisher, key);
 							subscribers[subscriber] = method;
 						}
