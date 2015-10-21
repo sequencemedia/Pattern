@@ -1,8 +1,12 @@
 node_modules
-assets/css/*
-assets/js/app/*
-assets/js/lib/*
-assets/js/vendor/modernizr.js
+assets/**/*.css
+assets/**/*.rb
+assets/**/*.sass
+assets/css/**/*
+assets/js/app/**/*
+assets/js/lib/**/*
+assets/js/*.*
+assets/js/vendor/**/*
 views/*
 *.html
 package.json
