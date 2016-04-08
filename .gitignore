@@ -7,6 +7,9 @@ assets/js/app/**/*
 assets/js/lib/**/*
 assets/js/*.*
 assets/js/vendor/**/*
+assets/js/Pattern.console.js
+assets/js/Pattern.json.js
+assets/js/Pattern.txt
 views/*
 *.html
 package.json
